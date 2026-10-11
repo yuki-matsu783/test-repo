@@ -1,2 +1,1 @@
-# i0001-01-02
-print(2)
+# rewritten
