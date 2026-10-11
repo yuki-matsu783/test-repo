@@ -1,4 +1,0 @@
-{"at": "2026-10-11T17:57:11Z", "ticket": "i0001-01-01", "kind": "approved", "from": "todo", "to": "doing", "via": "terminal", "tree": "i0001"}
-{"at": "2026-10-11T17:57:13Z", "ticket": "i0001-01-01", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "8a1fd8dff83b04d6c334ca1fc1ea70b5c76537ea"}
-{"at": "2026-10-11T17:57:16Z", "ticket": "i0001-01-01", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
-{"at": "2026-10-11T17:58:39Z", "ticket": "i0001-01-01", "kind": "settled", "from": "review", "to": "done", "via": "cli", "actor": "yuki-matsu783", "phase": 1}
