@@ -1,3 +1,4 @@
 {"at": "2026-10-11T17:47:38Z", "ticket": "i0001", "kind": "approved", "from": "todo", "to": "doing", "via": "terminal", "tree": "i0001"}
 {"at": "2026-10-11T17:47:39Z", "ticket": "i0001", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "6f4b3947f83728a51571b147f4fc10c31fa7e8b6"}
 {"at": "2026-10-11T17:47:45Z", "ticket": "i0001", "kind": "phase-mark", "from": null, "to": null, "via": "hook", "phase": 1, "mark": "pending"}
+{"at": "2026-10-11T17:48:07Z", "ticket": "i0001", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 1, "mark": "requested"}
