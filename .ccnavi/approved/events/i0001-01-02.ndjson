@@ -1,2 +1,3 @@
 {"at": "2026-10-11T18:17:50Z", "ticket": "i0001-01-02", "kind": "approved", "from": "todo", "to": "doing", "via": "terminal", "tree": "i0001"}
 {"at": "2026-10-11T18:17:54Z", "ticket": "i0001-01-02", "kind": "started", "from": "doing", "to": "doing", "via": "cli", "base_sha": "047a1f26a15ed4ef651504171cc21c9c34f6aef1"}
+{"at": "2026-10-11T18:17:59Z", "ticket": "i0001-01-02", "kind": "finished", "from": "doing", "to": "review", "via": "cli"}
