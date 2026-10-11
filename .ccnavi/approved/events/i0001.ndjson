@@ -4,3 +4,5 @@
 {"at": "2026-10-11T17:54:30Z", "ticket": "i0001", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "phase": 1, "mark": "requested"}
 {"at": "2026-10-11T17:55:29Z", "ticket": "i0001", "kind": "phase-mark", "from": null, "to": null, "via": "cli", "actor": "yuki-matsu783", "phase": 1, "mark": "reviewed"}
 {"at": "2026-10-11T17:55:45Z", "ticket": "i0001", "kind": "phase-mark", "from": null, "to": null, "via": "terminal", "actor": "yuki-matsu783", "phase": 1, "mark": "reviewed"}
+{"at": "2026-10-11T17:56:06Z", "ticket": "i0001", "kind": "finished", "from": "doing", "to": "done", "via": "cli"}
+{"at": "2026-10-11T17:56:06Z", "ticket": "i0001", "kind": "parent-mark", "from": null, "to": null, "via": "cli", "mark": "closed"}
