@@ -1,0 +1,66 @@
+# 実績で測るリスクの配点。子を閉じるときに、その子の差分（base_sha..HEAD）で数える。
+#
+# 計画のときに「軽い」と思った作業が大きな変更になっていたら、宣言に関わらずレビューが
+# 要る扱いにするためのもの。リスクレベルの名前は LOW / MEDIUM / HIGH / CRITICAL で固定。
+# HIGH 以上はレビューが済むまでフェーズを止める。境目の点は levels で動かす。
+#
+# 項目は 3 系統。
+#   定量（組み込み）: lines_over / files_over / deleted_over / glob（当たるごとに加点。max で上限）
+#   定量（スクリプト）: script: <.ccnavi/config/common/scripts/ の下>。cwd は子のワークツリー、
+#                      CCNAVI_BASE_SHA / CCNAVI_HEAD / CCNAVI_TICKET / CCNAVI_PARENT を受け取り、
+#                      標準出力に整数か {"points": N, "message": "..."} を出す。失敗は重い側（points を加点）
+#   定性（サブエージェント）: judge: <問い>。親がサブエージェントに判断させ、
+#                      'sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>' で記録する。
+#                      判定が揃うまで子は閉じられない。子の HEAD が動けば取り直し
+#
+# このファイルが無ければ組み込み（下の定量 4 項目と同じ値）。不正なら組み込みを使い、--lint が言う。
+version: 1
+levels:
+  medium: 20
+  high: 40
+  critical: 70
+factors:
+  - id: big-diff
+    points: 25
+    lines_over: 300
+    message: 行数が多い
+  - id: many-files
+    points: 15
+    files_over: 10
+    message: ファイルが多い
+  - id: deletes
+    points: 20
+    deleted_over: 3
+    message: 消したファイルが多い
+  # 例: 定性の項目。使うときにコメントを外す。
+  # - id: untested
+  #   points: 30
+  #   judge: テストの無い振る舞いの変更を含むか
+  #   message: テストの無い変更
+  # - id: breaking-change
+  #   points: 30
+  #   judge: 互換性を壊す変更（公開 API・設定の形・出力の形）を含むか
+  #   message: 互換性を壊す変更
+  #
+  # 例: 重要なパスの加点。差分が小さくても、1 つ当たるだけで HIGH（levels.high）に届く点にする。
+  # 使うときにコメントを外し、glob はこのリポジトリの置き場に合わせて直す。
+  # - id: auth-paths
+  #   points: 40
+  #   glob: "*/auth/*"
+  #   message: 認可に関わるパス
+  # - id: billing-paths
+  #   points: 40
+  #   glob: "*/billing/*"
+  #   message: 課金に関わるパス
+  # - id: db-migrations
+  #   points: 40
+  #   glob: "*/migrations/*"
+  #   message: DB 移行
+  # - id: ci-config
+  #   points: 40
+  #   glob: ".github/*"
+  #   message: CI 設定
+  # - id: public-api
+  #   points: 40
+  #   glob: "*/api/public/*"
+  #   message: 公開 API

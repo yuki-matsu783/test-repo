@@ -1,1 +1,7 @@
 **/ccnavi-index.jsonl
+
+# ccnavi が配る実行ファイル（scripts/ccnavi-setup.sh）
+/.ccnavi/bin/darwin-x86_64/
+
+# ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
+/scratchpad
