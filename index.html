@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>サンプルメモアプリ</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    #memo-input {
+      flex: 1;
+      padding: 12px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    #add-btn {
+      padding: 12px 24px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #add-btn:hover {
+      background-color: #0056b3;
+    }
+    #memo-list {
+      list-style: none;
+      padding: 0;
+    }
+    .memo-item {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 12px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .memo-text {
+      flex: 1;
+      word-break: break-word;
+    }
+    .memo-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .edit-btn, .delete-btn {
+      padding: 6px 12px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .edit-btn {
+      background-color: #28a745;
+      color: white;
+    }
+    .edit-btn:hover {
+      background-color: #218838;
+    }
+    .delete-btn {
+      background-color: #dc3545;
+      color: white;
+    }
+    .delete-btn:hover {
+      background-color: #c82333;
+    }
+    .editing .memo-text {
+      display: none;
+    }
+    .editing .edit-input {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      font-size: 16px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      margin-bottom: 8px;
+    }
+    .save-btn {
+      padding: 6px 12px;
+      font-size: 14px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .save-btn:hover {
+      background-color: #0056b3;
+    }
+    .cancel-btn {
+      padding: 6px 12px;
+      font-size: 14px;
+      background-color: #6c757d;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .cancel-btn:hover {
+      background-color: #5a6268;
+    }
+    .empty-message {
+      text-align: center;
+      color: #999;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>サンプルメモアプリ</h1>
+  <div class="input-group">
+    <input type="text" id="memo-input" placeholder="メモを入力してください" />
+    <button id="add-btn" onclick="addMemo()">追加</button>
+  </div>
+  <ul id="memo-list"></ul>
+
+  <script>
+    const STORAGE_KEY = 'sample-memos';
+
+    function loadMemos() {
+      const data = localStorage.getItem(STORAGE_KEY);
+      return data ? JSON.parse(data) : [];
+    }
+
+    function saveMemos(memos) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(memos));
+    }
+
+    function renderMemos() {
+      const memos = loadMemos();
+      const list = document.getElementById('memo-list');
+      list.innerHTML = '';
+
+      if (memos.length === 0) {
+        list.innerHTML = '<li class="empty-message">メモがありません。上の入力欄から追加してください。</li>';
+        return;
+      }
+
+      memos.forEach((memo, index) => {
+        const li = document.createElement('li');
+        li.className = 'memo-item';
+        li.dataset.index = index;
+        li.innerHTML = `
+          <span class="memo-text">${escapeHtml(memo.text)}</span>
+          <input type="text" class="edit-input" value="${escapeHtml(memo.text)}" style="display: none;" />
+          <div class="memo-actions">
+            <button class="edit-btn" onclick="editMemo(${index})">編集</button>
+            <button class="delete-btn" onclick="deleteMemo(${index})">削除</button>
+          </div>
+        `;
+        list.appendChild(li);
+      });
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function addMemo() {
+      const input = document.getElementById('memo-input');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const memos = loadMemos();
+      memos.push({ text, createdAt: Date.now() });
+      saveMemos(memos);
+      input.value = '';
+      renderMemos();
+    }
+
+    function editMemo(index) {
+      const memos = loadMemos();
+      const memo = memos[index];
+      const li = document.querySelector(`.memo-item[data-index="${index}"]`);
+      li.classList.add('editing');
+      li.innerHTML = `
+        <input type="text" class="edit-input" value="${escapeHtml(memo.text)}" />
+        <div class="memo-actions">
+          <button class="save-btn" onclick="saveMemo(${index})">保存</button>
+          <button class="cancel-btn" onclick="cancelEdit(${index})">キャンセル</button>
+        </div>
+      `;
+    }
+
+    function saveMemo(index) {
+      const memos = loadMemos();
+      const input = document.querySelector(`.memo-item[data-index="${index}"] .edit-input`);
+      const text = input.value.trim();
+      if (!text) return;
+
+      memos[index].text = text;
+      memos[index].updatedAt = Date.now();
+      saveMemos(memos);
+      renderMemos();
+    }
+
+    function cancelEdit(index) {
+      renderMemos();
+    }
+
+    function deleteMemo(index) {
+      if (!confirm('このメモを削除しますか？')) return;
+      const memos = loadMemos();
+      memos.splice(index, 1);
+      saveMemos(memos);
+      renderMemos();
+    }
+
+    // Enterキーで追加
+    document.getElementById('memo-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addMemo();
+    });
+
+    // 初期表示
+    renderMemos();
+  </script>
+</body>
+</html>
