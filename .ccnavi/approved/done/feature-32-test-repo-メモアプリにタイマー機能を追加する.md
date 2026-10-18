@@ -22,6 +22,7 @@ allow:
 started_at: "2026-10-18T19:30:00+09:00"
 base_sha: c0fb330
 feedback: []
+completed_at: "2026-10-18T20:08:20+0900"
 ---
 ## 背景
 
