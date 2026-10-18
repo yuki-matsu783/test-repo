@@ -22,6 +22,7 @@ allow:
     glob: "*.md"
 started_at: "2026-10-18T19:30:00+09:00"
 base_sha: c0fb330
+feedback: []
 ---
 ## 背景
 
