@@ -11,8 +11,7 @@ phases:
     review: mr
     scope: inherit
     when: 設計判断や並行作業が要らないとき
-plan:
-  - quick-work
+plan: []
 rationale: |
   メモアプリにポモドーロタイマー（作業25分/休憩5分のサイクル）を追加し、メモ作成中の集中力維持を支援する。既存のシンプルな構成（HTML+JS+localStorage）を活かし、最小限の変更で実装する。
 allow:
