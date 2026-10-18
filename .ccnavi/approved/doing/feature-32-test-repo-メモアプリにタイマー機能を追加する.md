@@ -20,6 +20,8 @@ allow:
     glob: "*.html"
   - match: Write|Edit
     glob: "*.md"
+started: "2026-10-18T19:30:00+09:00"
+baseline: c0fb330
 ---
 ## 背景
 
