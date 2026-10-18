@@ -127,10 +127,77 @@
       color: #999;
       padding: 20px;
     }
+    .timer-container {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      text-align: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .timer-display {
+      font-size: 48px;
+      font-weight: bold;
+      font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+      color: #333;
+      margin-bottom: 8px;
+    }
+    .timer-mode {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .timer-mode.work { color: #007bff; }
+    .timer-mode.break { color: #28a745; }
+    .timer-controls {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .timer-btn {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      min-width: 80px;
+    }
+    .timer-btn.primary {
+      background-color: #007bff;
+      color: white;
+    }
+    .timer-btn.primary:hover { background-color: #0056b3; }
+    .timer-btn.secondary {
+      background-color: #6c757d;
+      color: white;
+    }
+    .timer-btn.secondary:hover { background-color: #5a6268; }
+    .timer-btn.danger {
+      background-color: #dc3545;
+      color: white;
+    }
+    .timer-btn.danger:hover { background-color: #c82333; }
+    .timer-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
   <h1>サンプルメモアプリ</h1>
+  <div class="timer-container" id="timer-container">
+    <div class="timer-display" id="timer-display">25:00</div>
+    <div class="timer-mode work" id="timer-mode">作業</div>
+    <div class="timer-controls">
+      <button class="timer-btn primary" id="timer-start" onclick="startTimer()">開始</button>
+      <button class="timer-btn secondary" id="timer-pause" onclick="pauseTimer()" disabled>一時停止</button>
+      <button class="timer-btn danger" id="timer-reset" onclick="resetTimer()">リセット</button>
+    </div>
+  </div>
   <div class="input-group">
     <input type="text" id="memo-input" placeholder="メモを入力してください" />
     <button id="add-btn" onclick="addMemo()">追加</button>
@@ -231,6 +298,181 @@
       renderMemos();
     }
 
+    // ポモドーロタイマー
+    const TIMER_STORAGE_KEY = 'pomodoro-timer';
+    const WORK_DURATION = 25 * 60; // 25分
+    const BREAK_DURATION = 5 * 60; // 5分
+
+    let timerState = {
+      remaining: WORK_DURATION,
+      isWork: true,
+      isRunning: false,
+      lastTick: null
+    };
+    let timerInterval = null;
+
+    function loadTimerState() {
+      const data = localStorage.getItem(TIMER_STORAGE_KEY);
+      if (data) {
+        try {
+          const saved = JSON.parse(data);
+          timerState = { ...timerState, ...saved };
+        } catch (e) {
+          console.warn('Failed to parse timer state:', e);
+        }
+      }
+    }
+
+    function saveTimerState() {
+      localStorage.setItem(TIMER_STORAGE_KEY, JSON.stringify(timerState));
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+      document.getElementById('timer-display').textContent = formatTime(timerState.remaining);
+      const modeEl = document.getElementById('timer-mode');
+      modeEl.textContent = timerState.isWork ? '作業' : '休憩';
+      modeEl.className = 'timer-mode ' + (timerState.isWork ? 'work' : 'break');
+
+      const startBtn = document.getElementById('timer-start');
+      const pauseBtn = document.getElementById('timer-pause');
+      const resetBtn = document.getElementById('timer-reset');
+
+      if (timerState.isRunning) {
+        startBtn.disabled = true;
+        startBtn.textContent = '実行中';
+        pauseBtn.disabled = false;
+      } else {
+        startBtn.disabled = false;
+        startBtn.textContent = timerState.remaining === (timerState.isWork ? WORK_DURATION : BREAK_DURATION) ? '開始' : '再開';
+        pauseBtn.disabled = true;
+      }
+      resetBtn.disabled = timerState.remaining === (timerState.isWork ? WORK_DURATION : BREAK_DURATION) && !timerState.isRunning;
+    }
+
+    function playNotificationSound() {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.frequency.value = 800;
+      oscillator.type = 'sine';
+      gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 1);
+      oscillator.start(ctx.currentTime);
+      oscillator.stop(ctx.currentTime + 1);
+    }
+
+    function showNotification() {
+      const message = timerState.isWork ? '作業時間が終了しました。休憩しましょう！' : '休憩が終了しました。作業を再開しましょう！';
+      if (Notification.permission === 'granted') {
+        new Notification('ポモドーロタイマー', { body: message });
+      } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            new Notification('ポモドーロタイマー', { body: message });
+          }
+        });
+      }
+      // 視覚的通知（画面フラッシュ）
+      document.body.style.transition = 'background-color 0.3s';
+      document.body.style.backgroundColor = timerState.isWork ? '#fff3cd' : '#d4edda';
+      setTimeout(() => {
+        document.body.style.backgroundColor = '#f5f5f5';
+      }, 1000);
+    }
+
+    function tick() {
+      const now = Date.now();
+      if (timerState.lastTick) {
+        const elapsed = Math.floor((now - timerState.lastTick) / 1000);
+        timerState.remaining = Math.max(0, timerState.remaining - elapsed);
+      }
+      timerState.lastTick = now;
+
+      if (timerState.remaining <= 0) {
+        timerState.isWork = !timerState.isWork;
+        timerState.remaining = timerState.isWork ? WORK_DURATION : BREAK_DURATION;
+        timerState.isRunning = false;
+        playNotificationSound();
+        showNotification();
+      }
+
+      saveTimerState();
+      updateTimerDisplay();
+
+      if (timerState.remaining <= 0 && !timerState.isRunning) {
+        // タイマーが終了した場合、次のサイクルの準備
+        updateTimerDisplay();
+      }
+    }
+
+    function startTimer() {
+      if (timerState.isRunning) return;
+
+      loadTimerState();
+      timerState.isRunning = true;
+      timerState.lastTick = Date.now();
+      saveTimerState();
+
+      timerInterval = setInterval(tick, 1000);
+      tick(); // 即座に1回実行
+      updateTimerDisplay();
+    }
+
+    function pauseTimer() {
+      if (!timerState.isRunning) return;
+
+      timerState.isRunning = false;
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      saveTimerState();
+      updateTimerDisplay();
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      timerState.remaining = timerState.isWork ? WORK_DURATION : BREAK_DURATION;
+      timerState.lastTick = null;
+      saveTimerState();
+      updateTimerDisplay();
+    }
+
+    function initTimer() {
+      loadTimerState();
+      updateTimerDisplay();
+
+      // ページ読み込み時にタイマーが実行中だった場合、再開
+      if (timerState.isRunning) {
+        const now = Date.now();
+        if (timerState.lastTick) {
+          const elapsed = Math.floor((now - timerState.lastTick) / 1000);
+          timerState.remaining = Math.max(0, timerState.remaining - elapsed);
+        }
+        if (timerState.remaining > 0) {
+          timerState.lastTick = Date.now();
+          timerInterval = setInterval(tick, 1000);
+        } else {
+          // 既に終了していた場合
+          timerState.isRunning = false;
+          timerState.isWork = !timerState.isWork;
+          timerState.remaining = timerState.isWork ? WORK_DURATION : BREAK_DURATION;
+          playNotificationSound();
+          showNotification();
+        }
+        saveTimerState();
+        updateTimerDisplay();
+      }
+    }
+
     // Enterキーで追加
     document.getElementById('memo-input').addEventListener('keypress', (e) => {
       if (e.key === 'Enter') addMemo();
@@ -238,6 +480,7 @@
 
     // 初期表示
     renderMemos();
+    initTimer();
   </script>
 </body>
 </html>
