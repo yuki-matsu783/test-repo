@@ -18,6 +18,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "README.md"
+started_at: "2026-10-21T05:43:06+0900"
+base_sha: "941de04fb264c9fc92afee2811f8e15f88a54183"
 ---
 ## 背景
 

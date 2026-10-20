@@ -21,9 +21,15 @@ version: 1
 
 deny:
   # hook の場所
+  # 下書きの置き場（各ツリー直下の `wip/handoff/`）の中は、守る場所の写しなので外す。
+  # 写しは元と同じ相対パス（`wip/handoff/.ccnavi/scripts/x.sh` など）に置くので、パスに
+  # `.ccnavi/` や `.claude/` が入る。写しは、ユーザが `ccnavi user handoff` で取り込むまで効力が無い。
+  # `docs/wip/handoff/` のように、ツリーの直下でない綴りは外さない。
   - id: guard-hooks
     match: Write|Edit
     glob: "*/.claude/hooks/*"
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       hook 本体です。エージェントの判断で書き換えず、理由を
       伝えてユーザに変更を依頼してください。
@@ -32,6 +38,8 @@ deny:
   - id: guard-scripts
     match: Write|Edit
     glob: "*/.ccnavi/scripts/*"
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       事前に安全が確認されたコマンドのみを実行できるラッパースクリプトです。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
@@ -40,6 +48,8 @@ deny:
   - id: guard-ccnavi-config
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.ccnavi[\\/]config[\\/]common[\\/](rules|phases|risks)\.yml$'
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       ccnavi の設定（ルール・フェーズ定義・リスクの配点）です。エージェントの判断で
       書き換えず、下書きを検証したうえで何をなぜ変えるかを伝えてユーザに依頼してください
@@ -59,11 +69,13 @@ deny:
       - regex: '^{root}[\\/]scratchpad(?:[\\/]|$)'
       - regex: '^{root}[\\/]\.claude[\\/]worktrees(?:[\\/]|$)'
     message: >-
-      チェックアウトしたブランチ直下では編集しません。'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add
-      .claude/worktrees/<名前> -b <名前>' でワークツリーを切り、その中で編集して、
-      ff-only で統合先に取り込んでください。ワークスペースルートの `wip/handoff/`（ユーザに渡す物）と `scratchpad/`（使い捨て）へは書き込めます。
-      プロジェクト（projects/<名前>/）の中を直すときは、'cd projects/<名前>' してから、そのプロジェクトで
-      'sh {root}/.ccnavi/scripts/ccnavi-git.sh worktree add ...' を打ってワークツリーを切り、その中で編集してください。
+      チェックアウトしたブランチ直下では編集しません。{script:ccnavi-worktree.sh} <名前> でワークツリーを切り、出力されたパスの下で編集してコミットしてください。
+      名前は <先頭の語>-<番号>-<slug>（.ccnavi/docs/worktree.md「直接作業のワークツリーの名前」）。
+      統合先へ直接 merge しないでください。取り込みはターンの終わりに出る integrate の案内に従います。
+      案内が出ないときは .ccnavi/docs/worktree-merge.md「直接作業のワークツリーを取り込む」を読んでください。
+      ワークスペースルートの wip/handoff/（ユーザに渡す物）と scratchpad/（使い捨て）へは書き込めます。
+      プロジェクト（projects/<名前>/）の中を直すときは、cd projects/<プロジェクト名> && {script:ccnavi-worktree.sh} <名前> を実行します
+      （行き先は同じ {root}/.claude/worktrees/<名前>）。
 
   # セッションが示すスクラッチパッド（/tmp/claude-*/ の下の scratchpad）は置き場にしない。
   # ユーザに渡す物は wip/handoff/、使い捨てはワークスペースルート直下の scratchpad/ に置く
@@ -170,24 +182,35 @@ deny:
     match: Write|Edit|NotebookEdit
     glob: "*/.ccnavi/approved/*"
     message: >-
-      承認済みチケットです。承認はユーザが VS Code のボード（端末なら
-      'ccnavi --agree'）で行います。
+      承認済みチケットです。承認はユーザが VS Code のボード・Chrome のボード・
+      端末の 'ccnavi user agree'・置き場のファイルの移動のどれかで行います。
       承認が済んだかどうかは 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh status' で確かめてください。
       置き場のファイルを自分で探さず、承認を頼み直す前に status を打ってください。
       作業を終えたら 'sh {root}/.ccnavi/scripts/ccnavi-ticket.sh finish <識別子>' で
       レビュー待ち（wip/proposals/review/）へ動かしてください。
-      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書いて承認を依頼してください。
+      範囲を変えたいなら wip/proposals/todo/ に新しい提案を書き、{root}/.ccnavi/scripts/ccnavi-ticket.sh propose <識別子> で送ってから承認を依頼してください。
 
   # hook の登録と個人の上書き。ワークスペースルートの側は workspace-root が先に当たるが、
   # ワークツリー側の設定は統合で統合先へ入る道を持つので、そちらも名前で止める。
   - id: guard-settings
     match: Write|Edit|NotebookEdit
     regex: '[\\/]\.claude[\\/]settings(\.local)?\.json$'
+    except:
+      - regex: '^{root}(?:[\\/]projects[\\/][^\\/]+)?(?:[\\/]\.claude[\\/]worktrees[\\/][^\\/]+)?[\\/]wip[\\/]handoff[\\/]'
     message: >-
       hook の登録そのものです。ワークツリー側の設定も統合で統合先の設定になります。
       エージェントの判断で書き換えず、理由を伝えてユーザに変更を依頼してください。
 
 ask:
+  # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
+  # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。
+  # --side-by-side は自動復元を緩めるので、ほかにずれが無くても必ずダイアログに出す。
+  - id: direct-worktree-confirm
+    match: Bash
+    regex: 'ccnavi-worktree\.sh\b[^\x00]*\s--(base|accept|side-by-side|adopt)(\s|=|$)'
+    additionalContext: >-
+      ユーザが取り込み先と状態を了承した。出力の「取り込み先:」「起点:」の行を報告に含め、作業後は integrate の案内に従う。
+
   # 依存関係の変更。pyproject.toml は依存の宣言、uv.lock は依存の固定。
   - id: dependencies
     match: Write|Edit
@@ -196,7 +219,7 @@ ask:
       実行時の依存が変わる場所です。増やす 1 本は、ガード自身が点検できない供給網の
       1 本になります。何を足すのか、外せない理由は何かを言ってください。
 
-  # 外から取ってくるコマンド。止めはしないが、行き先を 2 つに分ける。
+  # 外から取ってくるコマンド。行き先を 2 つに分ける。
   # 調査で一度きりなら WebFetch ツール、何度も叩くなら .ccnavi/scripts/ の sh。
   - id: prefer-webfetch
     match: Bash
@@ -218,7 +241,7 @@ allow:
     glob: "*/.claude/worktrees/*"
 
   # スキルの振り返り（.ccnavi/docs/skill-review.md）。ターンの終わり 10 回に 1 度、止めて手順を渡す。
-  # Stop はツールではなくメインエージェントのターンの終わり。何も許可しない。文を渡すためだけに allow に置く。
+  # Stop はツールではなくメインエージェントのターンの終わり。許可の意味は持たない。文を渡すためだけに allow に置く。
   # finish の促しが出る回・連鎖の 2 回目・サブエージェントでは止めず、数えもしない。
   - id: skill-review-every-10
     match: Stop
@@ -247,16 +270,16 @@ allow:
       git の入口は 'sh {root}/.ccnavi/scripts/ccnavi-git.sh <サブコマンド> ...' の形です。
       パスをそのまま書き、コマンド名を変数に入れないでください。diff も同じ入口です。
 
-  # ワークツリーを切る前に、統合先が古くないかを確かめさせる。止めない案内で、止める 2 重目の確認は
-  # ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
+  # 直接作業のワークツリーは {script:ccnavi-worktree.sh} だけで切る。手の worktree add に誘わない。
+  # ccnavi-git.sh の worktree add を直接打ったときの止めない案内（既存のブランチを出すときなど、親や子のワークツリー用）。
+  # 止める 2 重目の確認は ccnavi-git.sh の worktree add の中にある（hook は git もネットワークも起こさないので、遅れの判定はそこ）。
   - id: ccnavi-git-worktree-add
     match: Bash
     regex: 'ccnavi-git\.sh\s+worktree\s+add(\s|$)'
     additionalContextOnce: >-
-      ワークツリーを切る前に、先に 'sh {root}/.ccnavi/scripts/ccnavi-git.sh fetch origin <統合先>' を打ち、
-      'sh {root}/.ccnavi/scripts/ccnavi-git.sh log --oneline <統合先>..origin/<統合先>' で遅れを確かめてください。
-      遅れていれば、手元の統合先を進めてから（統合先のワークツリーで 'merge --ff-only origin/<統合先>'）切ります。
-      手順は .ccnavi/docs/worktree.md の「ワークツリーを切る」にあります。
+      直接作業のワークツリーは {script:ccnavi-worktree.sh} <名前> で切ります。取り込み先の確認・リモートとのずれの確認・
+      書きかけの扱いをまとめて行い、手で worktree add を打つ必要はありません。
+      worktree add が断られたら、出力の案内どおりに打ち直してください。手元の取り込み先は進めません。
 
   # ファイルを読むだけの cat と grep。止めずに通して、Read / Grep ツールのほうを
   # 一度だけ勧める。読む手段を取り上げるのが目的ではないので deny でも ask でもない。
