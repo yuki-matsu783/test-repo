@@ -418,7 +418,7 @@ find_posted() {
 	fi
 }
 
-# ---- Draft を外す。GitHub は GraphQL でしか外せない。GitLab は題の "Draft: " を除く。
+# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境は REST の ccr/ready_for_review）。GitLab は題の "Draft: " を除く。
 
 # 題の頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
 # sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
@@ -430,13 +430,35 @@ undraft() {
 	mr_number="$1"
 	if [ "$kind" = github ]; then
 		pr=$(api GET "repos/$path/pulls/$mr_number")
+		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
+		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
+		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも除く。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
 			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
 		fi
-		api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" '{}' >/dev/null || return 1
-		api GET "repos/$path/pulls/$mr_number" | "$JQ" -r '.draft // false'
+		query=$("$JQ" -n --arg id "$node" '{
+			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
+			variables: {id: $id}}')
+		gql_rc=0
+		res=$(gql "$query") || gql_rc=$?
+		case "$gql_rc" in
+		0) printf '%s' "$res" | "$JQ" -r '.data.markPullRequestReadyForReview.pullRequest.isDraft' ;;
+		3)
+			# GraphQL を使えない環境。Draft を外したあと、実状態（draft）を読んで返す（戻り値の形は GraphQL と同じ true / false）
+			rest_rc=0
+			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" >/dev/null || rest_rc=$?
+			if [ "$rest_rc" -eq 0 ]; then
+				api GET "repos/$path/pulls/$mr_number" | "$JQ" -r '.draft // false' || rest_rc=$?
+			fi
+			if [ "$rest_rc" -ne 0 ]; then
+				rest_fallback_failed "Draft の解除"
+				return 1
+			fi
+			;;
+		*) return 1 ;;
+		esac
 	else
 		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
 		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number の題を読めない。"
