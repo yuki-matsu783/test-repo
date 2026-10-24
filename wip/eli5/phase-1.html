@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>main.sh に版の表示を足す</title>
+<style>
+  :root { --bg: #ffffff; --fg: #1f2328; --muted: #656d76; --accent: #0969da; --card: #f6f8fa; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --accent: #4493f8; --card: #161b22; }
+  }
+  :root[data-theme="dark"] { --bg: #0d1117; --fg: #e6edf3; --muted: #8d96a0; --accent: #4493f8; --card: #161b22; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; line-height: 1.6; }
+  main { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; }
+  h2 { font-size: 1.15rem; margin-top: 2rem; color: var(--accent); }
+  .card { background: var(--card); border-radius: 12px; padding: 16px; margin: 12px 0; }
+  pre { background: var(--card); padding: 12px; border-radius: 8px; overflow-x: auto; }
+  .big { font-size: 2rem; font-weight: 700; color: var(--accent); }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>main.sh に「版の表示」を足す</h1>
+
+  <h2>なぜやるのか</h2>
+  <div class="card">
+    <p>いまのツールは、今どの版なのかをすぐに確かめる方法がありません。<br>
+    そこで「今の版は何か」を画面に出す合図を付けます。</p>
+  </div>
+
+  <h2>何が変わるか</h2>
+  <div class="card">
+    <p>コマンドに <code>--version</code> を付けて打つと、版の番号が 1 行だけ出て終わります。</p>
+    <pre>$ sh main.sh --version
+0.1.0</pre>
+    <p class="muted">版の番号は、ファイルの中の 1 か所にだけ書いてあります。</p>
+  </div>
+
+  <h2>変わらないこと</h2>
+  <div class="card">
+    <p>いつもの使い方は今までどおりです。</p>
+    <pre>$ sh main.sh 入力ファイル パターン 出力名</pre>
+    <p>入力の絞り込みと番号付けの結果も、変更の前と同じ内容になることを確かめました。</p>
+  </div>
+
+  <h2>リスク</h2>
+  <div class="card">
+    <p><span class="big">小さい</span></p>
+    <p>変えたのは 1 つのファイルの数行だけです。<code>--version</code> を付けたときだけ動く新しい道で、ほかの使い方には影響しません。</p>
+  </div>
+
+  <h2>ユーザに見てほしいこと</h2>
+  <div class="card">
+    <p>「<code>--version</code> で 0.1.0 が出るか」と「いつもの使い方が変わっていないか」の 2 点です。</p>
+  </div>
+</main>
+</body>
+</html>
