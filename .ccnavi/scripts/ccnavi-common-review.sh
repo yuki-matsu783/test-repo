@@ -218,27 +218,15 @@ threads() {
 	mr_number="$1"
 	mr_url="$2"
 	if [ "$kind" = github ]; then
-		owner="${path%%/*}"
-		repo="${path#*/}"
-		cursor=null
-		all='[]'
-		page=0
-		while :; do
-			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$mr_number" --argjson c "$cursor" '{
-				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}} last:comments(last:1){nodes{id createdAt author{login}}}}}}}}",
-				variables: {o: $o, r: $r, n: $n, c: $c}}')
-			res=$(api POST graphql "$query")
-			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c | (.last.nodes[0] // {}) as $l |
-				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // ""),
-				 last_id: ($l.id // ""), last_at: ($l.createdAt // ""), last_author: ($l.author.login // "")}]')
-			all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
-			more=$(printf '%s' "$res" | "$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
-			[ "$more" = true ] || break
-			cursor=$(printf '%s' "$res" | "$JQ" '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
-			page=$((page + 1))
-			[ "$page" -gt 20 ] && fail too-many-threads "reviewThreads が多すぎて読み切れない。"
-		done
-		printf '%s' "$all"
+		# REST（GraphQL を制限する環境向け）。解決状態は ccr/review_threads、本文と URL は pulls/<n>/comments から合わせる。
+		ccr=$(api GET "repos/$path/pulls/$mr_number/ccr/review_threads") || return 1
+		cmts=$(pages "repos/$path/pulls/$mr_number/comments") || return 1
+		printf '%s\n%s' "$ccr" "$cmts" | "$JQ" -s '.[0] as $t | .[1] as $c |
+			[$t[] | (.comment_ids[0]) as $f | (.comment_ids[-1]) as $l |
+			($c | map(select(.id == $f))[0] // {}) as $fc | ($c | map(select(.id == $l))[0] // {}) as $lc |
+			{id: ($f | tostring), resolved: .resolved, url: ($fc.html_url // ""), path: (.path // ""), line: (.line // 0),
+			 body: ($fc.body // ""), created_at: ($fc.created_at // ""),
+			 last_id: ($l | tostring), last_at: ($lc.created_at // ""), last_author: ($lc.user.login // "")}]'
 	else
 		# 判定に使う note は、discussion の note から system: true を除いたもの（空なら discussion ごと除く）。
 		# 対象は、その note が 1 つでも resolvable な discussion。代表の note（本文・url・位置・作成者）は

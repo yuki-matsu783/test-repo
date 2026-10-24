@@ -430,18 +430,13 @@ undraft() {
 	mr_number="$1"
 	if [ "$kind" = github ]; then
 		pr=$(api GET "repos/$path/pulls/$mr_number")
-		node=$(printf '%s' "$pr" | "$JQ" -r '.node_id // empty')
-		[ -n "$node" ] || fail no-node-id "マージリクエスト #$mr_number の node_id を読めない。"
-		# 題の "Draft: " は GitLab の流儀で付けたもの。GitHub は Draft をフラグで持つので、フラグを外すときに題からも除く。
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
 			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
 		fi
-		query=$("$JQ" -n --arg id "$node" '{
-			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
-			variables: {id: $id}}')
-		api POST graphql "$query" | "$JQ" -r '.data.markPullRequestReadyForReview.pullRequest.isDraft'
+		api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" '{}' >/dev/null || return 1
+		api GET "repos/$path/pulls/$mr_number" | "$JQ" -r '.draft // false'
 	else
 		title=$(api GET "projects/$(encoded_path)/merge_requests/$mr_number" | "$JQ" -r '.title // empty')
 		[ -n "$title" ] || fail no-mr-title "マージリクエスト !$mr_number の題を読めない。"
