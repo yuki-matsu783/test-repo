@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>テキスト整形CLI（フェーズ 1）の説明</title>
+<style>
+  body { font-family: sans-serif; line-height: 1.7; max-width: 720px; margin: 0 auto; padding: 16px; color: #222; }
+  h1 { font-size: 1.4em; }
+  h2 { font-size: 1.1em; margin-top: 1.6em; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+  code { background: #f3f3f3; padding: 1px 4px; border-radius: 3px; }
+  pre { background: #f3f3f3; padding: 8px; overflow-x: auto; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>テキスト整形CLI（フェーズ 1）の説明</h1>
+
+<h2>何を作ったか</h2>
+<p>
+  テキストファイルから、決めた言葉を含む行だけを取り出し、番号を振って別のファイルに書き出すコマンドを作りました。
+  コマンドは <code>main.sh</code> です。まだ中身が空だった <code>main</code> の部分を書きました。
+</p>
+
+<h2>どう使うか</h2>
+<pre>sh main.sh 入力ファイル 探す言葉 出力の名前</pre>
+<p>
+  たとえば <code>sh main.sh memo.txt りんご result</code> と打つと、<code>memo.txt</code> の中で「りんご」を含む行だけを選び、
+  <code>result.txt</code> に番号つきで書きます。
+</p>
+
+<h2>動きの例</h2>
+<ul>
+  <li>探す言葉を含む行が見つかったら、行の頭の空白を取り、「1.」「2.」と番号を振って書きます。</li>
+  <li>見つからなかったら、中身が空のファイルを作って正常に終わります。</li>
+  <li>材料にするファイルが無いときは、エラーを出して止まります。ファイルは作りません。</li>
+  <li>打つ言葉が足りないときは、使い方を表示して止まります。</li>
+</ul>
+
+<h2>何が変わるか</h2>
+<p>
+  今まで何もしなかったコマンドが、上の動きをするようになりました。
+  他の部分（説明の文書や、ほかのファイル）は変えていません。
+</p>
+
+<h2>リスク</h2>
+<p>
+  リスクは低いです。新しく動くのは <code>main.sh</code> だけで、ほかの機能とつながっていません。
+  確認は、正常な場合、言葉が見つからない場合、材料が無い場合、言葉が足りない場合の 4 通りで行い、すべて想定どおりに動きました。
+</p>
+
+<h2>レビューしてほしいこと</h2>
+<ul>
+  <li>「探す言葉」の決め方（今は行の中に含まれるかだけを見ます）で足りているか。</li>
+  <li>番号の付け方、行頭の空白の扱いが、目的に合っているか。</li>
+</ul>
+</body>
+</html>
