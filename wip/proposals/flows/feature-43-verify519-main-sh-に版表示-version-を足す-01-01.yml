@@ -1,0 +1,21 @@
+version: 1
+nodes:
+  - id: start
+    type: start
+    text: 子のワークツリーで main.sh を編集する
+  - id: impl
+    type: work
+    text: main の先頭に --version の判定を足し、0.1.0 を 1 行出して終了する。ほかの処理は変えない
+  - id: check
+    type: work
+    text: sh main.sh --version、引数不足の使い方、3 引数の実行の出力を確かめ、結果を報告する
+  - id: end
+    type: end
+    text: コミットして終わる
+edges:
+  - from: start
+    to: impl
+  - from: impl
+    to: check
+  - from: check
+    to: end
