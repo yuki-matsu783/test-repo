@@ -10,3 +10,5 @@
 
 # ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
 /logs/
+
+/.claude/worktrees/
