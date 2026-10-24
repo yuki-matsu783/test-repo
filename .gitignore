@@ -5,3 +5,8 @@
 
 # ccnavi の使い捨ての置き場（scripts/ccnavi-setup.sh）
 /scratchpad
+
+/.ccnavi/bin/linux-x86_64/
+
+# ccnavi の実行時の記録（scripts/ccnavi-setup.sh）
+/logs/

@@ -23,22 +23,28 @@
 # 残りの関数は、同じディレクトリの部品 5 本に分けてあり、このファイルの最後で読む。
 # 部品は単体では読まない。呼ぶ側は今までどおりこのファイルだけを読む。
 #
-#   ccnavi-common-state.sh  取り込み状態と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）と、
+#   ccnavi-common-state.sh  state の置き場と統合先（ccnavi_state・ccnavi_integration・ccnavi_parent_tree など）、
+#                           親ブランチの push の関門（ccnavi_push_gate）、
 #                           タイムアウト監視つきの git（ccnavi_git_timed・ccnavi_git_refusal）
 #   ccnavi-common-lock.sh   親子のチケットのロック（ccnavi_lock_take・ccnavi_lock_drop など）
-#   ccnavi-common-c1.sh     C1。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_c1_*）
+#   ccnavi-common-write-and-push.sh     write-and-push。チケットの状態を書く一連の操作を 1 つにまとめる（ccnavi_wap_*）
 #   ccnavi-common-host.sh   ホスト（GitHub / GitLab）への接続（ccnavi_host_*）
 #   ccnavi-common-log.sh    診断ログの 4 つ（log_debug / log_info / log_warn / log_error）。標準出力にも
 #                           標準エラーにも何も出さず、`logs/diag/<出どころ>.log` に 1 行足すだけ。
 #                           決まりは ccnavi のリポジトリの docs/claude/logging.md
 #
 # 部品が 1 本でも欠けていれば、標準エラーに配り直しを言って 1 で終わる。
+#
+# ccnavi-common-review.sh（ホストのマージリクエストを読む側）は、ここでは読まない。ホストの道具が要るので、
+# レビューの sh（ccnavi-review.sh・ccnavi-user-decide.sh・ccnavi-user-close-early.sh）がこのファイルの後に自分で読む。
+# 共通部（ccnavi-common*.sh）には、読む側とエージェントも使う関数だけを置く。ユーザの判断を書く処理は
+# ユーザ専用の sh（ccnavi-user-*.sh）の中だけに置く。
 
 # この sh が頼る実行ファイルの契約の版（互換の版）。実行ファイルの src/ccnavi/entry/version.py の COMPAT、
 # VS Code 拡張の EXTENSION_COMPAT と同じ値に揃える。上げるのは、sh が頼るフラグや出力の形を
-# sh を直さないと動かない形に変えたときと、データの形（待ち方の置き場・取り下げの条件など）が
+# sh を直さないと動かない形に変えたときと、データの形（先行関係の置き場など）が
 # 変わるとき（上げ方は src/ccnavi/entry/version.py の説明）。`ccnavi --lint` もこの行を読んで比べる。
-CCNAVI_COMPAT=11
+CCNAVI_COMPAT=19
 
 # 相対パスを絶対に直す。
 #
@@ -101,11 +107,28 @@ ccnavi_abs() {
 	esac
 }
 
+# 引数を単引用符で囲んで出す。中の ' は '"'"' に直す。案内の文に、そのまま打てるパスを載せる。
+# <文字列>
+ccnavi_sh_quote() {
+	ccnavi_q_rest=$1
+	ccnavi_q_out=""
+	while :; do
+		case "$ccnavi_q_rest" in
+		*\'*)
+			ccnavi_q_out="${ccnavi_q_out}${ccnavi_q_rest%%\'*}'\"'\"'"
+			ccnavi_q_rest=${ccnavi_q_rest#*\'}
+			;;
+		*) break ;;
+		esac
+	done
+	printf "'%s%s'\n" "$ccnavi_q_out" "$ccnavi_q_rest"
+}
+
 # 実在するディレクトリの、リンクを解いたパス。無ければ受けたパスをそのまま返す。
 #
 # git の `rev-parse --show-toplevel` はリンクを解いたパスを返すので、ワークスペースルート（cwd から
 # 論理のパスで決まる）と比べるときは両辺をこれで揃える。揃えないと、リンクを経た作業場で
-# 「.claude/worktrees/ の下か」の比較が外れ、組み込みの保護が当てはまらない。Windows は pwd -W の表記。
+# 「.claude/worktrees/ の下か」の比較が外れ、組み込みの保護が該当しない。Windows は pwd -W の表記。
 ccnavi_phys() {
 	[ -n "${1:-}" ] || return 0
 	(cd "$1" 2>/dev/null && { pwd -W 2>/dev/null || pwd -P; }) || printf '%s\n' "$1"
@@ -121,18 +144,18 @@ ccnavi_phys() {
 # ディレクトリの `.ccnavi/scripts/` だけでは足りない。ccnavi ディレクトリの下には配点が呼ぶスクリプトの
 # 置き場として同じパスがあり、プロジェクトの中から打つとそのプロジェクトを根と取り違える。
 # `.git` は駄目（プロジェクトも持つ）。`.claude/` だけも駄目（Claude Code が作る場合が
-# あり、プロジェクト側にできたものに当たる）。
+# あり、プロジェクト側にできたものにヒットする）。
 #
-# ワークツリーは候補にせず、最初に当たったものを返す。
+# ワークツリーでないディレクトリのうち、最初にヒットしたものを返す。
 #
 # `.ccnavi/scripts/` は git で追跡されているので、どのワークツリーにもコピーがある。
-# 単純に「最初に当たったもの」にすると、ワークツリーの中から打ったときワークツリー自身が
+# 単純に「最初にヒットしたもの」にすると、ワークツリーの中から打ったときワークツリー自身が
 # 根になる。ところが `logs/state/`（state の置き場）は追跡外でワークツリーには無く、承認済みチケットも
 # ワークスペースルートに置かれたばかりのものはワークツリーに届いていないので、どちらも見つからなくなる。ccnavi が使うもののうち
 # git でワークツリーに届くものと届かないものがあり、根は届かないほうに合わせる必要がある。
 #
-# だから `.claude/worktrees/` の下にあるものは候補にしない。最初に当たった
-# 「ワークツリーでない」ディレクトリが根になる。
+# だから `.claude/worktrees/` の下にあるものは候補から外し、最初にヒットした
+# 「ワークツリーでない」ディレクトリを根にする。
 #
 # 最外を取る形にはしない。ワークスペースがユーザのホームの下にあり、そこに
 # `~/.ccnavi/scripts/ccnavi-common.sh` が在ると、そちらを選ぶ。近いほうから決める。
@@ -151,6 +174,21 @@ ccnavi_workspace() {
 			case "$ccnavi_ws_here" in
 			*/.claude/worktrees/*) ;; # ワークツリーの中のコピー。根ではない
 			*)
+				# プロジェクト（<根>/projects/<名前>/）が自前の .ccnavi/scripts/ のコピーを持つとき、
+				# そこで止まると logs/ や state がプロジェクトの中にできる。`projects/` の親に
+				# ワークスペースがあれば、そちらを根にする。
+				ccnavi_ws_out=$(dirname "$ccnavi_ws_here")
+				ccnavi_ws_outer=$(dirname "$ccnavi_ws_out")
+				case "$ccnavi_ws_out" in
+				*/projects)
+					if [ -f "$ccnavi_ws_outer/.ccnavi/scripts/ccnavi-common.sh" ]; then
+						case "$ccnavi_ws_outer" in
+						*/.claude/worktrees/*) ;;
+						*) ccnavi_ws_here="$ccnavi_ws_outer" ;;
+						esac
+					fi
+					;;
+				esac
 				printf '%s\n' "$ccnavi_ws_here"
 				return 0
 				;;
@@ -164,22 +202,29 @@ ccnavi_workspace() {
 
 # 起動する実行ファイルのパス。見つからなければ 1 を返す（ソースで動かすかは呼ぶ側が決める）。
 #
-# ユーザが端末から打つ場面では settings.json の env が反映されないので、CCNAVI_BIN_PATH が
+# ユーザがターミナルから打つ場面では settings.json の env が反映されないので、CCNAVI_ENTRY_PATH が
 # 無いのが普通。そのときは ccnavi のリポジトリの組み立て（dist/ccnavi/ccnavi）、次に
 # hook と同じ振り分けの sh（.ccnavi/scripts/ccnavi-launcher.sh）を見る。振り分けの sh は
 # .ccnavi/bin/ があるときだけ選ぶ。無いのに選ぶと、ソースで動かせる ccnavi のリポジトリでも
-# 「実行ファイルが無い」で止まる。
+# 「実行ファイルが無い」で止まる。bin/ もソースも無い配布先では、PATH の ccnavi を返す（無ければ 1）。
 #
 # それぞれ `.exe` を付けた名前も見る（Windows の組み立て）。
 ccnavi_bin() {
-	case "${CCNAVI_BIN_PATH:-}" in
+	case "${CCNAVI_ENTRY_PATH:-}" in
 	'')
 		ccnavi_bin_try "$1/dist/ccnavi/ccnavi" && return 0
-		[ -d "$1/.ccnavi/bin" ] || return 1
-		ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		if [ -d "$1/.ccnavi/bin" ]; then
+			ccnavi_bin_try "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		elif [ ! -f "$1/src/ccnavi/__main__.py" ]; then
+			# bin/ もソースも無い配布先。PATH の ccnavi があればそれを返す（振り分けの sh と同じ規則）。
+			# 無ければ 1 を返すので、呼び手の「実行ファイルが無い」の分岐は今までと同じ。
+			ccnavi_bin_path "$1/.ccnavi/scripts/ccnavi-launcher.sh"
+		else
+			return 1
+		fi
 		;;
-	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_BIN_PATH" ;;
-	*) ccnavi_bin_try "$1/$CCNAVI_BIN_PATH" ;;
+	/* | [A-Za-z]:*) ccnavi_bin_try "$CCNAVI_ENTRY_PATH" ;;
+	*) ccnavi_bin_try "$1/$CCNAVI_ENTRY_PATH" ;;
 	esac
 }
 
@@ -187,22 +232,48 @@ ccnavi_bin() {
 # 食い違えば直し方を含む 1 行を標準出力に出して 1 を返す。呼ぶ側はその行を標準エラーへ書き、止めずに先へ進む。
 # 止めるか通すかは実行ファイルと hook が判定する。
 #
-# `--version` を知らない古い実行ファイルは互換の版を答えないので、古い版として知らせる。
-# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら配り直し。
+# 直し方は、ccnavi のリポジトリ（build.py とソースがある）なら組み立て直し、配布先なら実行ファイルと sh の配り直し
+# （scripts/ccnavi-setup.sh --force）。
 ccnavi_compat_skew() {
 	ccnavi_cs_out=$("$2" --version </dev/null 2>/dev/null) || ccnavi_cs_out=""
 	ccnavi_cs_have=$(printf '%s\n' "$ccnavi_cs_out" | sed -n 's/^compat:[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' | head -n 1)
 	if [ -f "$1/build.py" ] && [ -f "$1/src/ccnavi/__main__.py" ]; then
 		ccnavi_cs_fix="build.py を実行して組み立て直してください（uv run --with pyinstaller python build.py）"
 	else
+		# sh が古いと、新しい実行ファイルは古い形の呼び出し（ユーザ専用の操作を `user` の外で使う形）を断る。
+		# 配り直しは sh も入れ替える。
 		ccnavi_cs_fix="ccnavi のリポジトリで build.py を実行し、scripts/ccnavi-setup.sh <このワークスペース> --force で実行ファイルと sh を配り直してください"
 	fi
-	if [ -z "$ccnavi_cs_have" ]; then
-		printf '実行ファイル %s は --version で互換の版を返しません（古い版です）。%s。\n' "$2" "$ccnavi_cs_fix"
-		return 1
-	fi
 	[ "$ccnavi_cs_have" = "$CCNAVI_COMPAT" ] && return 0
-	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "$ccnavi_cs_have" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	printf '実行ファイル %s は互換 %s、sh は互換 %s で食い違っています。%s。\n' "$2" "${ccnavi_cs_have:-不明}" "$CCNAVI_COMPAT" "$ccnavi_cs_fix"
+	return 1
+}
+
+# PATH の ccnavi。振り分けの sh（ccnavi-launcher.sh の ccnavi_launcher_path）と同じ規則:
+# 絶対パスの項目だけを見て、通常ファイルで実行できる最初のものを返す。$1 は振り分けの sh のパス。
+# これと同じファイル（ccnavi という名前で張ったリンク）は、起動すると自分に戻るので飛ばす。
+ccnavi_bin_path() {
+	ccnavi_bp_ifs=$IFS
+	case $- in *f*) ccnavi_bp_noglob=1 ;; *) ccnavi_bp_noglob=0 ;; esac
+	set -f
+	IFS=:
+	for ccnavi_bp_dir in $PATH; do
+		case "$ccnavi_bp_dir" in
+		/*) ;;
+		*) continue ;;
+		esac
+		for ccnavi_bp_name in ccnavi ccnavi.exe; do
+			ccnavi_bp_file=$ccnavi_bp_dir/$ccnavi_bp_name
+			if [ -f "$ccnavi_bp_file" ] && [ -x "$ccnavi_bp_file" ] && ! [ "$ccnavi_bp_file" -ef "${1:-}" ]; then
+				IFS=$ccnavi_bp_ifs
+				[ "$ccnavi_bp_noglob" = 1 ] || set +f
+				printf '%s\n' "$ccnavi_bp_file"
+				return 0
+			fi
+		done
+	done
+	IFS=$ccnavi_bp_ifs
+	[ "$ccnavi_bp_noglob" = 1 ] || set +f
 	return 1
 }
 
@@ -332,8 +403,8 @@ ccnavi_is_ident() {
 
 # 親のブランチ名として受けてよい書き方なら 0。<語>
 #
-# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。C1 の対象決めなど、呼ぶたびに
-# 実行ファイルを起こせない所で使う。字の種類・NFC・長さは見ないので、名前を受け入れる入口（ccnavi-start.sh・
+# 実行ファイルの `ticket_ids.branch_problem` の複製（ASCII で見分けられる分だけ）。write-and-push の対象決めなど、呼ぶたびに
+# 実行ファイルを起こせない所で使う。名前を受け入れる入口（ccnavi-start.sh・
 # ccnavi-worktree.sh・ccnavi-git.sh の worktree add）は実行ファイルに聞く（`ccnavi_id_ask`）。規則を変えるときは両方を直す。
 #
 # 親のブランチ名は識別子の字に階層の区切りの `/` を足したもの（`feature/123-login`）。実行ファイル
@@ -377,7 +448,19 @@ ccnavi_branch_to_id() {
 # 環境変数からは受け取らない。置き場を外から差し替えられると、保護していない場所の sh を
 # 保護済み sh の中で走らせられるため。
 ccnavi_lib_dir=$(dirname "$0")
-for ccnavi_lib_part in state lock c1 host log; do
+
+# 部品のうち、ここでは読まず呼ぶ側が読むもの（ccnavi-common-review.sh など）を読む。<ファイル名>
+# 置き場は上の部品と同じ（呼んだ sh のディレクトリ）。無ければ配り直しを言って 1 で終わる
+# （読めないまま `.` に進むと、シェルの生のエラーだけが出る）。
+ccnavi_load() {
+	[ -f "$ccnavi_lib_dir/$1" ] || {
+		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/$1" >&2
+		exit 1
+	}
+	. "$ccnavi_lib_dir/$1"
+}
+
+for ccnavi_lib_part in state lock write-and-push host log; do
 	[ -f "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" ] || {
 		printf 'ccnavi: 共通部の部品 %s が見つかりません。scripts/ccnavi-setup.sh --force で配り直してください\n' "$ccnavi_lib_dir/ccnavi-common-$ccnavi_lib_part.sh" >&2
 		exit 1

@@ -4,16 +4,22 @@
 #   sh .ccnavi/scripts/ccnavi-review.sh request --phase <N> --body-file <依頼文> --eli5 <HTML>
 #   sh .ccnavi/scripts/ccnavi-review.sh confirm --phase <N>
 #   sh .ccnavi/scripts/ccnavi-review.sh comment --body-file <本文>
-#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N>          （ユーザが端末で打つ）
+#   sh .ccnavi/scripts/ccnavi-review.sh decide  <N> --preview （残った指摘の一覧を JSON で見るだけ。ボードも読む）
 #   sh .ccnavi/scripts/ccnavi-review.sh fetch                 （取ってきた時点の状態を JSON で見る）
 #   sh .ccnavi/scripts/ccnavi-review.sh merged [<番号>]       （MR がマージ済みか。番号で聞くこともできる。ccnavi-sync.sh が使う）
+#   sh .ccnavi/scripts/ccnavi-review.sh mr-state <番号>       （MR の今の状態を読むだけ。ボードの「マージ状況を確認」が使う）
 #   sh .ccnavi/scripts/ccnavi-review.sh ready [--parent <親>]                  （閉じたチケットを logs/archive/ へ退避し、MR の Draft を外し、子と親のワークツリーと合流済みの子のブランチを片付ける）
-#   sh .ccnavi/scripts/ccnavi-review.sh close-early --reason <理由> [--no-issue]  （ユーザが端末で打つ。残りを issue に書き出して早めに閉じる）
 #   sh .ccnavi/scripts/ccnavi-review.sh origin                                 （origin をどう読んだか。ホスト・scheme・API の URL）
 #
+# ユーザだけが打つ操作は、ユーザ専用の sh（ccnavi-user-*.sh）に分けた。エージェントからは hook が名前で止める。
+#
+#   ccnavi-user-decide.sh <N> [--choices <JSON> --digest <ダイジェスト>]   残った指摘の対応方針を決めて置く
+#   ccnavi-user-close-early.sh --reason <理由> [--no-issue]               まだ残っているが早めに閉じる
+#
 # リモート（GitHub / GitLab）を読み書きするのはこのスクリプトで、ccnavi の実行ファイルは
-# ネットワークに出ない。実行ファイルが見るのは作業ツリーの中（フェーズ・ブランチ・マーカー）
-# だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。
+# ネットワークに出ない。実行ファイルが見るのはワークツリーの中（フェーズ・ブランチ・マーカー）
+# だけで、マージリクエストの中身はここが取ってきて JSON で渡す（--result）。ホストを読む関数と write-and-push の支度は
+# ccnavi-common-review.sh にあり、ユーザ専用のレビューの sh と共有する。
 #
 #   request: `ccnavi review prepare` が前提を確かめ、依頼の本文とマージリクエストの
 #            下書きを書き出す → ここが（無ければ）マージリクエストを下書きで作り、依頼を投稿する
@@ -25,42 +31,50 @@
 #            HEAD に入って push されていれば、マージリクエストの差分に載る。ここは拡張子・在ること・
 #            中身があること・wip/eli5/ の下にあること・名前の字・HEAD で普通のファイル（100644）として
 #            HEAD と同じ中身でコミット済みであることを確かめ、
-#            実行ファイルには渡さない。crit は起動しない（待ち続けるため）。投稿が済んだら、ユーザが打つ
+#            実行ファイルには渡さない。投稿が済んだら、ユーザが打つ
 #            `crit review <パス>` と `crit push <番号>` を標準出力に出す。crit push で送られた指摘は
-#            マージリクエストの行のスレッドになり、confirm が未解決として数え、decide で選べる。
+#            マージリクエストの行のスレッドになり、confirm が未解決として数え、ccnavi-user-decide.sh で選べる。
 #   confirm: ここがスレッドとレビューを取ってくる → `ccnavi review confirm` が判定してマーカーを置き、
 #            レビュー待ち（wip/proposals/review/）の子を .ccnavi/approved/done/ へ動かす。
 #            トークンの持ち主（GitHub は login、GitLab は username）を引けたら --actor で渡し、マーカーに残す。
-#            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ
-#   decide:  ここが取ってくる → `ccnavi --reviewed N --accept-unresolved` がユーザに見せ、指摘ごとに
-#            対応しない・このフェーズで直す（続きの子チケット）・issue に回すを選ばせる
-#            → issue に回す分があればここが issue を作り、決めた内容をコメントに書き出す
-#            ボードは同じ経路を --preview（一覧を読む）と --choices --digest（押した選択を置く）で通る
+#            actor は記録で、判定には使わない。引けなければ渡さず、マーカーは前と同じ。
+#            ユーザが子を手で done/ に動かして commit・push 済みなら、移動の前に付いた未解決の指摘は
+#            ホストで解決せず、版つきで phases/<親>/accepted.json（受け入れ台帳）に足して確定する
+#            （マーカーに via: manual と moved）。台帳に受け入れた指摘は、版と最後のコメントの id が同じ間は数えない。
+#            移動の後に付いた指摘が残れば確定しない。変更要求は保留
+#   decide <N> --preview:
+#            ここが取ってくる → `ccnavi --reviewed N --accept-unresolved --preview` が見せる一覧を JSON で返す。
+#            何も置かない（見るだけ）。選んだものを置くのは ccnavi-user-decide.sh
 #
-# リモートへの道具は、gh / glab があればそれ（認証はツールに任せる）、無ければ curl と
-# GITHUB_TOKEN / GITLAB_TOKEN。どちらも無ければ止まる。結果の組み立てには jq が要る。
-# 道具は起動時に絶対パスへ解いて固定する。PATH の細工で差し替えられないように。
-#
-# 取り込み済みの親子のチケット（origin があり、親子のチケットの取り込み状態が present。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
-# request（マーカー）・confirm・decide（--preview を除く）・ready を C1 で回す
+# 取り込み済みの親子のチケット（origin があり、write-and-push の対象に入るもの。マージリクエストで見るフェーズが無いものを除く）では、状態を書く
+# request（マーカー）・confirm・ready を write-and-push で回す
 # （Chrome 拡張から見える親子のチケットに未 push の状態を溜めないため）。
-# ロック → 途中の操作の確認 → hook のマーカーと状態の履歴を先にコミット → 取り込み → 未送信の確かめを済ませてから
+# ロック → 途中の操作の確認 → hook のマーカーを先にコミット → 取り込み → 未送信の確かめを済ませてから
 # ホストに触り、実行ファイルが書いたパスだけを commit --only して push する。送れなければ戻す。
-# ユーザの判断（close-early）は実行ファイルが書いた後、取り込み済みの親子のチケットなら
-# 承認の push（ccnavi-push-approved.sh <親>）を呼んで送る。
-# ユーザの判断を溜めずにその場で送るためで、送れなければ次の C1 が止まり、承認の push の打ち直しを案内する。
 # それ以外は今のまま。
 #
 # 親のワークツリーの中で実行すること。どの親かは cwd から引く。ready だけは `--parent <親>` で
 # 外（ワークスペースルートなど）からも打てる。外から打てば、Draft を外したあとに親のワークツリーも消える。
 # 終了コード: 0 成功 / 1 前提の未充足 / 2 引数か環境の誤り /
 #             3 merged だけ: MR がマージ済みかを確かめられなかった（"unknown" を出す。推定せずに止める）
+#
+# mr-state <番号>: 読むだけ。何も書かず、実行ファイルも起こさない。標準出力は 2 行で、機械が読む。
+# 区切りは空白 1 つ。1 行目は版 `mr-state 1`、2 行目は次のどれか。
+#   open <番号> <yes|no> <URL>        開いている（3 つめは Draft か）
+#   merged <番号> <URL>               マージ済み
+#   closed <番号> <URL>               マージせずに閉じた
+#   unknown <種類> <理由>             確かめられなかった。種類は no-tool（jq・gh/glab・curl が無い）/
+#                                     auth（トークンが無い、認証に失敗した）/ network（ホストに届かない）/
+#                                     api（API の失敗、答えを読めなかった）/ not-found（MR・リポジトリ・origin が無い）。
+#                                     理由は 1 行の日本語で、資格情報は含まない
+# 終了コードは、状態が分かれば 0、unknown なら 1、引数の誤りは 2（標準出力は空で、標準エラーに理由）。
+# 番号は 1 から始まる数字だけ。merged 副命令の出力と終了コード（3）は変えない。
 
 set -eu
 
 usage() {
 	cat <<'USAGE'
-sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-early|fetch|origin|merged> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
+sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|fetch|origin|merged|mr-state> [--phase <N>] [--body-file <path>] [--eli5 <html>] [--parent <親>]
 
   request      --phase <N> --body-file <依頼文> --eli5 <HTML>
                                                   前提を確かめ、無ければマージリクエストを作り、依頼を投稿してマーカーを置く。
@@ -69,30 +83,29 @@ sh .ccnavi/scripts/ccnavi-review.sh <request|confirm|comment|decide|ready|close-
                                                   wip/eli5/phase-<N>.html）に置いてコミットし、push しておく（マージリクエストの
                                                   差分に載せる）。相対パスは実行した場所から。投稿が済むと、ユーザが実行する
                                                   crit review <パス> と crit push <番号> を出す
-  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（依頼の時刻では絞らない）
+  confirm      --phase <N>                        未解決（Unresolved）のスレッドが 1 つも無ければマーカーを置く（未解決のスレッドは依頼の時刻に関わらずすべて数える。手で done/ に動かして共有した子は、移動の前の指摘を台帳 accepted.json に版つきで受け入れて確定する）
   comment      --body-file <本文>                 判断の記録をマージリクエストのコメントに書き出す
-  decide       <N> [--preview]                    未解決（Unresolved）の指摘の対応方針を指摘ごとに選ぶ。対応しない・このフェーズで直す・issue に回す（ユーザが端末で実行します。--preview は一覧を JSON で見るだけ）
+  decide       <N> --preview                      未解決（Unresolved）の指摘と、選べる対応方針の一覧を JSON で見るだけ。何も置かない
   ready        [--parent <親>]                    閉じられて push 済みなら、クローズ済みのチケットを logs/archive/ へ退避し wip/ の追跡済みのファイルを削除して削除を push し、Draft を解除する（「マージに進んでよい」の合図。マージはユーザが squash で）。最後に親のワークツリーを削除します（中から実行したときは消さず、外から実行する 1 本を出す）。--parent なら親のワークツリーの外から実行できる
-  close-early  --reason <理由> [--no-issue]       まだ残っているが早めに閉じる判断（ユーザが端末で実行します）。残りを issue に書き出す。Draft は親が ready で外す
   fetch                                           リモートから取ってきた時点の状態を JSON で標準出力へ
   origin                                          origin をどう読んだか（ホスト・scheme・API の URL）
   merged [<番号>]                                 マージリクエスト（番号で指定、省けばいまのブランチのもの）がマージ済みなら "merged <番号> <先頭の sha> <元ブランチ>"、無ければ "none"、確かめられなければ "unknown"（終了コード 3。ccnavi-sync.sh が閉じたかを確かめる）
+  mr-state <番号>                                 マージリクエストの今の状態を読むだけ。1 行目 "mr-state 1"、2 行目は "open <番号> <yes|no> <URL>"（yes は Draft）・"merged <番号> <URL>"・"closed <番号> <URL>"・"unknown <種類> <理由>"（終了コード 1。種類は no-tool / auth / network / api / not-found）。ボードの「マージ状況を確認」が使う
+
+ユーザがターミナルで実行する操作は別の sh:
+  ccnavi-user-decide.sh <N>          指摘の対応方針を選んで置く（対応しない・このフェーズで直す・issue に回す）
+  ccnavi-user-close-early.sh --reason <理由> [--no-issue]
+                                     まだ残っているが早めに閉じる。残りを issue に書き出す。Draft は親が ready で外す
 
 gh / glab があればそれを使う。無ければ curl と GITLAB_TOKEN / GITHUB_TOKEN。jq が必要です。
 USAGE
 }
 
-# fail <識別子> <文面> [終了コード]。文面は標準エラーへ出す契約。識別子は止めた理由の種類を
-# 表す短い語で、診断ログにだけ残す。文面には origin やパスが入るので、ログには写さない。
-fail() {
-	printf 'ccnavi-review: %s\n' "$2" >&2
-	# 診断ログ。上の文面は契約として決まっている出力で、診断ログはそれとは別に残すだけ。
-	log_info 止めた -- "sub=${sub:-}" "exit=${3:-1}" "reason=$1"
-	exit "${3:-1}"
-}
-
 # 共通部分。ワークスペースルートの探し方と、URL の資格情報を伏せる処理はここにある。
 . "$(dirname "$0")/ccnavi-common.sh"
+# レビューの sh が共有する、ホストを読む側の部品。
+review_label=ccnavi-review
+ccnavi_load ccnavi-common-review.sh
 
 [ "$#" -ge 1 ] || {
 	usage
@@ -100,35 +113,228 @@ fail() {
 }
 sub="$1"
 shift
+# 診断ログに残す引数の数（サブコマンドを除いた、読む前の数）。
+args_n=$#
 case "$sub" in
-request | confirm | comment | decide | ready | close-early | fetch | origin | merged) ;;
+request | confirm | comment | decide | ready | fetch | origin | merged | mr-state) ;;
 -h | --help | help)
 	usage
 	exit 0
 	;;
 *)
-	fail unknown-sub "$sub は使用できません。使えるのは request / confirm / comment / decide / ready / close-early / fetch / origin / merged です。" 2
+	fail unknown-sub "$sub は指定できません。指定できるのは request / confirm / comment / decide / ready / fetch / origin / merged / mr-state です。" 2
 	;;
 esac
 
-# ---- 場所。ワークスペースルートと、いまのワークツリー。Windows の Git Bash では pwd -W でパスの表記を直す。
+# ---- decide は、見るだけの --preview だけを受ける。選んだものを置くのはユーザ専用の ccnavi-user-decide.sh。
+if [ "$sub" = decide ]; then
+	n="${1:-}"
+	case "$n" in
+	'' | *[!0-9]*) fail decide-no-phase "decide には <N>（フェーズ番号）が必要です。" 2 ;;
+	esac
+	# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
+	n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
+	shift
+	preview=0
+	for decide_arg in "$@"; do
+		case "$decide_arg" in
+		--preview) preview=1 ;;
+		--json) ;;
+		*) fail decide-bad-option "decide は $decide_arg を受けない。" 2 ;;
+		esac
+	done
+	[ "$preview" -eq 1 ] || fail decide-no-preview "decide は <N> --preview だけを受ける。選んだものを置くのは ccnavi-user-decide.sh です。" 2
+fi
+
+# ---- mr-state <番号>。MR の今の状態を、機械が読む 2 行で答える（読むだけ）。
 #
-# 根は git に聞かない。モード B では cwd がプロジェクトの中にあると git は
-# プロジェクトを答え、チケット・マーカー・状態の置き場がプロジェクト側を指してしまう。
-# 道具の置き場は上へたどって探す。
-root=$(ccnavi_workspace) ||
-	fail no-workspace "ワークスペースルートが見つかりません（.ccnavi/scripts/ccnavi-common.sh を持つ親を cwd から上へ探しました）。ワークスペースの中で実行するか、CCNAVI_WORKSPACE にワークスペースルートの絶対パスを渡してください。" 2
-# 解いたルートを logger に渡し、書くたびに探し直させない。
-ccnavi_log_root="$root"
-here="$(pwd -W 2>/dev/null || pwd)"
-state="$root/logs/state" # 固定
-# このスクリプトの置き場（絶対パス）。`ready --parent` は親のワークツリーへ cd するので、相対の `$0`
-# （`sh .ccnavi/scripts/ccnavi-review.sh`）をその後で解くと、親のワークツリーの中の写しを指すか、見失う。
-# cd の前に解いておき、以降はこれを使う。
-script_dir=$(cd "$(dirname "$0")" && pwd)
-# 実行ファイルに渡す cwd（どの親かを引く場所）。ふつうは打った場所で、`ready --parent <親>` のときだけ
-# 親のワークツリーにする。
-exe_cwd="$here"
+# 番号は 1 から始まる数字だけ（9 桁まで）。誤りは標準出力に何も出さず、標準エラーに理由を書いて 2 で終わる。
+mr_state_number=""
+if [ "$sub" = mr-state ]; then
+	[ "$#" -eq 1 ] || fail mr-state-args "mr-state には MR の番号を 1 つだけ渡してください。" 2
+	case "$1" in
+	'' | 0* | *[!0-9]*) fail mr-state-number "mr-state の MR の番号 (${1}) は 1 から始まる数字で渡してください。" 2 ;;
+	esac
+	[ "${#1}" -le 9 ] || fail mr-state-number "mr-state の MR の番号 (${1}) が大きすぎます。" 2
+	mr_state_number="$1"
+fi
+
+# 答えの 2 行目を出して終わる。理由は 1 行にそろえる（制御文字を空白にし、空白の連続を 1 つにする）。
+# 理由には資格情報を入れない（ホストの返事の本文もコピーせず、決まった言葉と状態コードだけで組む）。
+mr_state_emit() {
+	printf 'mr-state 1\n%s\n' "$1"
+}
+
+mr_state_unknown() {
+	mrs_reason=$(printf '%s' "$2" | tr '\001-\037\177' ' ' | sed -e 's/  */ /g' -e 's/^ //' -e 's/ $//')
+	[ -n "$mrs_reason" ] || mrs_reason="理由は取れなかった"
+	log_info mr-stateを答えた -- "state=unknown" "kind=$1" "exit=1"
+	mr_state_emit "unknown $1 $mrs_reason"
+	exit 1
+}
+
+mr_state_known() {
+	log_info mr-stateを答えた -- "state=$1" "exit=0"
+	mr_state_emit "$2"
+	exit 0
+}
+
+# API の失敗の本文（gh / glab / curl の出力）から、種類（mrs_kind）と理由（mrs_why）を決める。
+# 本文は理由にコピーしない。ネットワークの失敗を先に見て（curl は 404 などを "error: 404" と書く）、次に状態コード。
+mr_state_classify() {
+	mrs_low=$(printf '%s' "$1" | tr 'A-Z' 'a-z')
+	mrs_code=$(printf '%s' "$mrs_low" | grep -o -E '(http |error: |: )[0-9]{3}( |$)' | head -n 1 | grep -o -E '[0-9]{3}' | head -n 1 || :)
+	mrs_with=""
+	[ -z "$mrs_code" ] || mrs_with="（HTTP ${mrs_code}）"
+	case "$mrs_low" in
+	*"could not resolve"* | *"couldn't resolve"* | *"no such host"* | *"failed to connect"* | *"couldn't connect"* | *"connection refused"* | *"connection reset"* | *"timed out"* | *"timeout"* | *"network is unreachable"* | *"dial tcp"* | *"i/o timeout"* | *"curl: (6)"* | *"curl: (7)"* | *"curl: (28)"* | *"curl: (35)"* | *"curl: (52)"* | *"curl: (56)"* | *"curl: (60)"*)
+		mrs_kind=network
+		mrs_why="ホストに届かない（ネットワークか、ホスト名を引けない）"
+		return 0
+		;;
+	*"rate limit"*)
+		mrs_kind=api
+		mrs_why="ホストの API の利用上限に達した${mrs_with}"
+		return 0
+		;;
+	esac
+	case "$mrs_code" in
+	404)
+		mrs_kind=not-found
+		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）${mrs_with}"
+		return 0
+		;;
+	401 | 403)
+		mrs_kind=auth
+		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）${mrs_with}"
+		return 0
+		;;
+	esac
+	case "$mrs_low" in
+	*"not found"*)
+		mrs_kind=not-found
+		mrs_why="MR #${mrs_n} が見つからない（番号か、リポジトリへの権限を確かめる）"
+		;;
+	*"bad credentials"* | *"unauthorized"* | *"forbidden"* | *"authentication"*)
+		mrs_kind=auth
+		mrs_why="認証に失敗した（トークンか gh / glab の認証を確かめる）"
+		;;
+	*)
+		mrs_kind=api
+		mrs_why="ホストの API が失敗した${mrs_with}"
+		;;
+	esac
+}
+
+# 失敗の本文を受ける置き場。ccnavi_host_api は部分シェルの中で失敗を知らせるので、ファイルで受け渡す。
+mr_state_note() {
+	printf '%s' "$3" >"$mrs_err" 2>/dev/null || :
+}
+
+# URL を 1 語にそろえる。空・空白や制御文字を含む・読めないときは、ホスト名とパスから組む。
+mr_state_url() {
+	mrs_url=$(ccnavi_mask_url "$1")
+	mrs_clean=$(printf '%s' "$mrs_url" | tr -d '\001-\040\177')
+	if [ -z "$mrs_clean" ] || [ "$mrs_clean" != "$mrs_url" ]; then
+		if [ "$ccnavi_h_kind" = github ]; then
+			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/pull/$mrs_n"
+		else
+			mrs_url="$ccnavi_h_scheme://$ccnavi_h_host/$ccnavi_h_path/-/merge_requests/$mrs_n"
+		fi
+	fi
+}
+
+mr_state() {
+	mrs_n="$1"
+	# ホストの返事の読み方は ccnavi-common-host.sh と同じ。ここは失敗を、決まった種類に分けて答えるだけ。
+	origin=$(git remote get-url origin 2>/dev/null || :)
+	[ -n "$origin" ] || mr_state_unknown not-found "origin がありません"
+	mrs_rc=0
+	ccnavi_host_parse "$origin" || mrs_rc=$?
+	case "$mrs_rc" in
+	0) ;;
+	4) mr_state_unknown not-found "${ccnavi_h_parse_why}" ;;
+	*) mr_state_unknown not-found "origin からホストかプロジェクトのパスを読めない" ;;
+	esac
+	mrs_rc=0
+	ccnavi_host_connect || mrs_rc=$?
+	case "$mrs_rc" in
+	0) ;;
+	3) mr_state_unknown no-tool "jq が見つからない" ;;
+	4)
+		if [ -n "${ccnavi_h_cli:-}" ]; then
+			mr_state_unknown auth "${ccnavi_h_cli_name} が ${ccnavi_h_host} で利用できず（未認証か、ホストに届かない）、${ccnavi_h_token_name} もない"
+		fi
+		mr_state_unknown auth "${ccnavi_h_cli_name} が無く、${ccnavi_h_token_name} もない"
+		;;
+	*) mr_state_unknown no-tool "${ccnavi_h_cli_name} も curl も利用できない" ;;
+	esac
+
+	# 失敗の本文の置き場。state が書けなければ TMPDIR。終わるときに消す。
+	mkdir -p "$state" 2>/dev/null || :
+	if [ -d "$state" ] && [ -w "$state" ]; then
+		mrs_tmp="$state"
+	else
+		mrs_tmp="${TMPDIR:-/tmp}"
+	fi
+	mrs_err="$mrs_tmp/ccnavi-mr-state-err-$$"
+	trap 'rm -f "$mrs_err" 2>/dev/null || :' EXIT
+	ccnavi_h_tmp="$mrs_tmp"
+	ccnavi_h_on_fail=mr_state_note
+	ccnavi_h_max_time=30
+
+	if [ "$ccnavi_h_kind" = github ]; then
+		mrs_rel="repos/$ccnavi_h_path/pulls/$mrs_n"
+		mrs_jq='if type == "object" then "\(.number // "-") \(.state // "-") \(.merged == true or (.merged_at // null) != null) \(.draft == true) \(.html_url // "")" else empty end'
+	else
+		mrs_rel="projects/$(ccnavi_host_encoded_path)/merge_requests/$mrs_n"
+		mrs_jq='if type == "object" then "\(.iid // "-") \(.state // "-") \(.state == "merged") \((.draft // .work_in_progress) == true) \(.web_url // "")" else empty end'
+	fi
+	mrs_rc=0
+	mrs_answer=$(ccnavi_host_api GET "$mrs_rel") || mrs_rc=$?
+	if [ "$mrs_rc" -ne 0 ]; then
+		mrs_body=$(cat "$mrs_err" 2>/dev/null || :)
+		mr_state_classify "$mrs_body"
+		mr_state_unknown "$mrs_kind" "$mrs_why"
+	fi
+	mrs_line=$(printf '%s' "$mrs_answer" | "$ccnavi_h_jq" -r "$mrs_jq" 2>/dev/null) || mrs_line=""
+	[ -n "$mrs_line" ] || mr_state_unknown api "ホストの答えを読めなかった"
+
+	# 空白で 5 つに分ける（URL は最後。展開を避けるため、パラメータ展開だけで切る）。
+	mrs_number="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_st="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_merged="${mrs_line%% *}"
+	mrs_line="${mrs_line#* }"
+	mrs_draft="${mrs_line%% *}"
+	mrs_raw_url="${mrs_line#* }"
+	[ "$mrs_raw_url" != "$mrs_line" ] || mrs_raw_url=""
+	[ "$mrs_number" = "$mrs_n" ] || mr_state_unknown api "ホストが別の MR（${mrs_number}）を返した"
+	mr_state_url "$mrs_raw_url"
+	if [ "$mrs_merged" = true ]; then
+		mr_state_known merged "merged $mrs_n $mrs_url"
+	fi
+	case "$mrs_st" in
+	open | opened)
+		if [ "$mrs_draft" = true ]; then
+			mrs_yes=yes
+		else
+			mrs_yes=no
+		fi
+		mr_state_known open "open $mrs_n $mrs_yes $mrs_url"
+		;;
+	closed) mr_state_known closed "closed $mrs_n $mrs_url" ;;
+	locked) mr_state_unknown api "MR #${mrs_n} はマージの途中（locked）" ;;
+	*) mr_state_unknown api "ホストが想定外の state（${mrs_st}）を返した" ;;
+	esac
+}
+
+review_place
+
+if [ "$sub" = mr-state ]; then
+	mr_state "$mr_state_number"
+fi
 
 # ---- ready --parent <親>。親のワークツリーの外（ワークスペースルートなど）から打つ形。
 #
@@ -176,239 +382,22 @@ if [ "$sub" = ready ]; then
 	fi
 fi
 
-# ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
+# ---- 実行ファイル。merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
+review_exe || [ "$sub" = merged ] || review_no_bin
 
-# 実行ファイルと互換の版が食い違っていれば、最初に呼ぶときに 1 度だけ言う（止めない）。
-# 引数の誤りで断る経路と、実行ファイルを使わない副命令（origin / fetch / comment）では起こさない。
-# `$( )` の中から呼ぶと、1 度言ったことの目印（told_skew）が親に残らないので、そう呼ぶ前には親で先に tell_skew を打つ。
-told_skew=""
-tell_skew() {
-	[ -z "$told_skew" ] || return 0
-	told_skew=1
-	# ソースで動かすとき（bin が無い）は、sh と同じツリーのものを動かすので比べない。
-	[ -n "${bin:-}" ] || return 0
-	skew=$(ccnavi_compat_skew "$root" "$bin") || printf 'ccnavi-review: %s\n' "$skew" >&2
-}
-
-if bin=$(ccnavi_bin "$root"); then
-	ccnavi() {
-		tell_skew
-		"$bin" --root "$root" --cwd "$exe_cwd" "$@"
-	}
-elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$exe_cwd" "$@"); }
-elif [ "$sub" != merged ]; then
-	# merged は実行ファイルを起こさない（ホストに聞くだけ）ので、無くても進める。
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
-fi
-
-# 実行ファイルがそのフラグを知っているか（`--version --json` の flags で見る）。
-# 知らない古い実行ファイルには `--actor`・`--via` を渡さない（渡すと引数の誤りで失敗する。マーカーは前と同じ中身になる）。
-# 答えは 1 度だけ引いて覚えておく。`$( )` の中から呼ぶと覚えた値が親に残らないので、親で呼ぶ。
-exe_flags=""
-exe_flags_read=""
-exe_knows() {
-	if [ -z "$exe_flags_read" ]; then
-		exe_flags_read=1
-		exe_flags=$(ccnavi --version --json </dev/null 2>/dev/null | tr -d '\r') || exe_flags=""
-	fi
-	case "$exe_flags" in
-	*"\"$1\""*) return 0 ;;
-	esac
-	return 1
-}
-
-# ---- リモート。origin の URL でホストを見分ける。
-needs_host=yes
-if [ "$needs_host" = yes ]; then
-	origin=$(git remote get-url origin 2>/dev/null || :)
-	[ -z "$origin" ] && fail no-origin "origin がありません。レビューは実際のマージリクエストに結び付けるので、リモートが必要です。"
-	# 伏せた表記を、読む前に 1 度だけ作る。以降、文面に使うのはこれだけ。
-	# 生の $origin を文面に入れる書き方を 1 つも残さないことで、次に fail を足す人が
-	# 気づかずに生の値を使わないようにする。URL に資格情報を埋める使い方は普通にあり、
-	# 出力はエージェントの文脈にも記録にも残る。
-	origin_shown=$(ccnavi_mask_url "$origin")
-	# origin の読み方と道具の選び方は ccnavi-common-host.sh の「ホスト（GitHub / GitLab）への接続」にある
-	# （ccnavi-branches.sh と共有する）。ここは失敗の文面を決め、以降で使う変数に入れるだけ。
-	ccnavi_host_parse "$origin" || {
-		case "$?" in
-		2) fail origin-no-host "origin からホストを読めない ($origin_shown)。" ;;
-		3) fail origin-no-path "origin からプロジェクトのパスを読めない ($origin_shown)。" ;;
-		*) fail origin-unreadable "origin の URL を読めない ($origin_shown)。" ;;
-		esac
-	}
-	scheme="$ccnavi_h_scheme"
-	host="$ccnavi_h_host"
-	path="$ccnavi_h_path"
-	kind="$ccnavi_h_kind"
-	token_name="$ccnavi_h_token_name"
-	api_base="$ccnavi_h_api_base"
-	branch=$(git rev-parse --abbrev-ref HEAD)
-
-	# ---- 道具。絶対パスに解いて固定する。
-	ccnavi_host_connect || {
-		case "$?" in
-		3) fail no-jq "jqが見つかりません。結果の JSON を作成できません。" 2 ;;
-		4) fail no-transport-token "$ccnavi_h_cli_name が $host で使えず（未導入か未認証）、curl に付ける $token_name もありません。$token_name を置くか、$ccnavi_h_cli_name を $host に認証してください。" 2 ;;
-		*) fail no-transport "$ccnavi_h_cli_name が $host で使えず、curl もありません。どちらかを用意するか、スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけなので、エージェントは JSON を作らずに止まり、ユーザに頼んでください（ユーザが MCP などでリモートを読める道具でスレッドとレビューを JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を実行します）。" 2 ;;
-		esac
-	}
-	JQ="$ccnavi_h_jq"
-	CLI="$ccnavi_h_cli"
-	CURL="$ccnavi_h_curl"
-	token="$ccnavi_h_token"
-	transport="$ccnavi_h_transport"
-	ccnavi_h_tmp="$state"
-	ccnavi_h_on_fail=api_failed
-fi
-branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || :)
-# 親の識別子。親のワークツリー（.claude/worktrees/<識別子>）の名前で、親のブランチ名
-# の / を - に置き換えたもの（ブランチ名とは違うことがある）。マージリクエストは居るブランチ（branch）で探して作り、
-# C1 の親子のチケット・下書きの名前（実行ファイルと揃える）は識別子で引く。ワークツリーの外なら前どおりブランチ名。
-family="$branch"
-review_top=$(git rev-parse --show-toplevel 2>/dev/null || :)
-if [ -n "$review_top" ]; then
-	review_top_p=$(ccnavi_phys "$review_top")
-	review_root_p=$(ccnavi_phys "$root")
-	case "$review_top_p" in
-	"$review_root_p"/.claude/worktrees/*)
-		family="${review_top_p#"$review_root_p"/.claude/worktrees/}"
-		family="${family%%/*}"
-		;;
-	esac
-fi
-
-# api <METHOD> <path> [<JSON body>] レスポンスの JSON を標準出力へ。path は api_base からの相対。
-# 中身は ccnavi-common-host.sh の ccnavi_host_api。失敗したら標準出力には何も出さず、ホストが返した本文ごと
-# 標準エラーへ出して（api_failed）1 を返す。curl の 1 回の時間の上限は ccnavi_h_max_time（既定 120 秒）。
-api() {
-	ccnavi_host_api "$@"
-}
-
-api_failed() {
-	printf 'ccnavi-review: %s への %s %s が失敗した:\n%s\n' "$host" "$1" "$2" "$3" >&2
-	# GraphQL を制限している実行環境がある（Claude Code のセッションは REST だけ通す）。
-	# GitHub ではスレッドの解決状態（threads）と Draft 外し（undraft）が GraphQL でしか
-	# 扱えないので、そこだけが 403 で止まる。curl の経路は -f が本文を捨てるため、
-	# 画面に残るのは番号だけになり、認証の失敗と見分けが付かない。止まったその場で
-	# 代わりの方法を名指しする。書き方は transport を選ぶところの案内と揃える。
-	case "$2" in
-	graphql)
-		printf 'ccnavi-review: %s\n' \
-			"GraphQL を使えない環境では confirm / fetch（スレッドの解決状態）と ready（Draft 外し）が通りません。スレッドとレビューの JSON を実行ファイルへ直接渡せるのはユーザだけです。エージェントは JSON を作らず、実行せずに止まり、ユーザに次を頼んでください: MCP などリモートを読める道具でスレッドとレビューを fetch_all と同じ形 {host, mr, threads, reviews, fetched_at} の JSON にし、端末で 'ccnavi review confirm --phase <N> --result <json>' を実行します。Draft 外しもユーザにその道具の側で行ってもらってください。" >&2
-		;;
-	esac
-}
-
-# pages <path> 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
-pages() {
-	pages_rc=0
-	ccnavi_host_pages "$1" || pages_rc=$?
-	[ "$pages_rc" -eq 2 ] && fail too-many-pages "$1 が多すぎて読み切れない。"
-	return "$pages_rc"
-}
-
-encoded_path() {
-	ccnavi_host_encoded_path
-}
-
-# ---- マージリクエスト。無ければ空。
-
-find_mr() {
-	if [ "$kind" = github ]; then
-		owner="${path%%/*}"
-		api GET "repos/$path/pulls?state=open&head=$owner:$branch" |
-			"$JQ" '.[0] // empty | {number: .number, url: .html_url, source: .head.ref, target: .base.ref, draft: (.draft // false)}'
-	else
-		# このプロジェクトのブランチから出た MR だけ（フォークの同じ名前のブランチの MR を拾わない）。
-		# API は source_project_id で絞れないので、全ページを読んでから絞る（1 ページ目がフォークで埋まっても目的のものを外さない）
-		pid=$(project_id) || fail no-project-id "GitLab のプロジェクト $path の id を読めない。マージリクエストがこのプロジェクトから出たかを確かめられないので止めた（PAT の権限と origin の URL を見直してください）。"
-		mrs=$(pages "projects/$(encoded_path)/merge_requests?state=opened&source_branch=$branch") ||
-			fail mr-list-failed "親ブランチ $branch のマージリクエストの一覧を読めない（ホストの返事は上に出ている）。"
-		printf '%s' "$mrs" |
-			"$JQ" --argjson pid "$pid" '[.[] | select(.source_project_id == $pid)][0] // empty | {number: .iid, url: .web_url, source: .source_branch, target: .target_branch, draft: (.draft // .work_in_progress // false)}'
-	fi
-}
-
-# GitLab のプロジェクトの数の id。読めなければ 1
-project_id() {
-	ccnavi_host_project_id
-}
+# ---- リモート。
+review_host
 
 # ---- 統合先。MR のマージ先と比べる。MR は作らない（作るのは ccnavi-start.sh）。
 
 default_branch() {
-	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ順（CCNAVI_INTEGRATION_BRANCH →
-	# ccnavi-sync.sh の取り込み結果 → origin/HEAD → origin/main・master。ccnavi-common-state.sh の ccnavi_integration）で、
-	# cwd のツリーが属するリポジトリについて決める。どれも決まらなければ main。
+	# 統合先。ccnavi-fetch.sh がワークツリーの起点に使うのと同じ決め方（origin/HEAD → origin/main・master。
+	# ccnavi-common-state.sh の ccnavi_integration）で、cwd のツリーが属するリポジトリについて決める。
+	# 決まらなければ当てずっぽうの main にせず、案内を出して止まる。
 	db_tree=$(git rev-parse --show-toplevel 2>/dev/null || :)
-	db_name=$(ccnavi_integration "${db_tree:-.}" "$root") || db_name=""
-	[ -n "$db_name" ] && printf '%s' "$db_name" || printf 'main'
-}
-
-# ---- スレッド。GitHub は GraphQL でしか解決状態を読めない。GitLab は discussions。
-
-threads() {
-	mr_number="$1"
-	mr_url="$2"
-	if [ "$kind" = github ]; then
-		owner="${path%%/*}"
-		repo="${path#*/}"
-		cursor=null
-		all='[]'
-		page=0
-		while :; do
-			query=$("$JQ" -n --arg o "$owner" --arg r "$repo" --argjson n "$mr_number" --argjson c "$cursor" '{
-				query: "query($o:String!,$r:String!,$n:Int!,$c:String){repository(owner:$o,name:$r){pullRequest(number:$n){reviewThreads(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{id isResolved comments(first:1){nodes{url path line body createdAt}}}}}}}",
-				variables: {o: $o, r: $r, n: $n, c: $c}}')
-			res=$(api POST graphql "$query")
-			chunk=$(printf '%s' "$res" | "$JQ" '[.data.repository.pullRequest.reviewThreads.nodes[] | . as $t | (.comments.nodes[0] // {}) as $c |
-				{id: $t.id, resolved: $t.isResolved, url: ($c.url // ""), path: ($c.path // ""), line: ($c.line // 0), body: ($c.body // ""), created_at: ($c.createdAt // "")}]')
-			all=$(printf '%s\n%s' "$all" "$chunk" | "$JQ" -s '.[0] + .[1]')
-			more=$(printf '%s' "$res" | "$JQ" -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')
-			[ "$more" = true ] || break
-			cursor=$(printf '%s' "$res" | "$JQ" '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')
-			page=$((page + 1))
-			[ "$page" -gt 20 ] && fail too-many-threads "reviewThreads が多すぎて読み切れない。"
-		done
-		printf '%s' "$all"
-	else
-		pages "projects/$(encoded_path)/merge_requests/$mr_number/discussions" |
-			"$JQ" --arg u "$mr_url" '[.[] | select((.notes // []) | length > 0) | select(.notes[0].resolvable) | . as $d | .notes[0] as $n |
-				{id: ($d.id | tostring), resolved: ([$d.notes[] | select(.resolvable) | .resolved] | all),
-				 url: ($u + "#note_" + ($n.id | tostring)), path: ($n.position.new_path // ""), line: ($n.position.new_line // 0),
-				 body: ($n.body // ""), created_at: ($n.created_at // ""), author: (($n.author.id // "") | tostring)}]'
-	fi
-}
-
-# ---- レビュー。変更要求の状態を CHANGES_REQUESTED にそろえる。
-
-reviews() {
-	mr_number="$1"
-	mr_url="$2"
-	if [ "$kind" = github ]; then
-		pages "repos/$path/pulls/$mr_number/reviews" |
-			"$JQ" '[.[] | {state: (.state // ""), url: (.html_url // ""), submitted_at: (.submitted_at // ""), author: ((.user.id // .user.login // "") | tostring)}]'
-	else
-		pages "projects/$(encoded_path)/merge_requests/$mr_number/reviewers" |
-			"$JQ" --arg u "$mr_url" '[.[] | {state: (if .state == "requested_changes" then "CHANGES_REQUESTED" else ((.state // "") | ascii_upcase) end),
-				url: $u, submitted_at: (.updated_at // .created_at // ""), author: ((.user.id // .user.username // "") | tostring)}]'
-	fi
-}
-
-# ---- 投稿。{url, created_at} を返す。
-
-comment() {
-	mr_number="$1"
-	mr_url="$2"
-	body_json=$("$JQ" -Rs '{body: .}' <"$3")
-	if [ "$kind" = github ]; then
-		api POST "repos/$path/issues/$mr_number/comments" "$body_json" |
-			"$JQ" '{url: (.html_url // ""), created_at: (.created_at // ""), author: (.user.login // "")}'
-	else
-		api POST "projects/$(encoded_path)/merge_requests/$mr_number/notes" "$body_json" |
-			"$JQ" --arg u "$mr_url" '{url: ($u + "#note_" + (.id | tostring)), created_at: (.created_at // ""), author: ((.author.id // "") | tostring)}'
-	fi
+	db_name=$(ccnavi_integration "${db_tree:-.}") || db_name=""
+	[ -n "$db_name" ] || fail no-integration "$(ccnavi_integration_hint "${db_tree:-.}")"
+	printf '%s' "$db_name"
 }
 
 # ---- 目印で始まる投稿を探す。{url, created_at} を返す（無ければ空）。<番号> <URL> <目印>
@@ -472,208 +461,19 @@ undraft() {
 	fi
 }
 
-# ---- issue を作る。下書きの 1 行目が題、3 行目からが本文。{number, url} を返す。
-
-create_issue() {
-	draft="$1"
-	if [ "$kind" = github ]; then
-		payload=$("$JQ" -n --rawfile all "$draft" \
-			'($all | split("\n")) as $l | {title: ($l[0]), body: ($l[2:] | join("\n"))}')
-		api POST "repos/$path/issues" "$payload" | "$JQ" '{number: .number, url: .html_url}'
-	else
-		payload=$("$JQ" -n --rawfile all "$draft" \
-			'($all | split("\n")) as $l | {title: ($l[0]), description: ($l[2:] | join("\n"))}')
-		api POST "projects/$(encoded_path)/issues" "$payload" | "$JQ" '{number: .iid, url: .web_url}'
-	fi
-}
-
-# ---- 決めた行き先を投稿する。exe が state の置き場に書いた下書きから、issue を作ってコメントを残す。
-#
-# 置いたあとの投稿なので、ここで失敗しても決めたことは戻さない。失敗は post_warning に言い、
-# 下書きは残す（打ち直せば投稿できる）。下書きの名前は exe と揃える（親の識別子。ブランチ名と違うことがある）。
-
-post_decision() {
-	issue_url=""
-	post_warning=""
-	number=$("$JQ" '.mr.number' "$result")
-	url=$("$JQ" -r '.mr.url' "$result")
-	issue_draft="$state/review-issue-$family-$1.md"
-	noted="$state/review-decide-$family-$1.md"
-	if [ -f "$issue_draft" ]; then
-		issue=$(create_issue "$issue_draft" || :)
-		if [ -n "$issue" ]; then
-			issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-			issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-			[ -f "$noted" ] && printf '\nissue に回した分: #%s %s\n' "$issue_no" "$issue_url" >>"$noted"
-			rm -f "$issue_draft"
-		else
-			post_warning="issue を作れなかった。下書きは $issue_draft にある"
-		fi
-	fi
-	if [ -f "$noted" ]; then
-		# comment は api と jq のパイプで、終了コードは jq のもの。投稿の失敗は URL が空で見分ける
-		posted=$(comment "$number" "$url" "$noted" || :)
-		if [ -n "$(printf '%s' "$posted" | "$JQ" -r '.url // empty' 2>/dev/null)" ]; then
-			rm -f "$noted"
-		else
-			post_warning="${post_warning:+${post_warning}。}マージリクエストにコメントを残せなかった。下書きは $noted にある"
-		fi
-	fi
-}
-
-# ---- トークンの持ち主（レビュー済みマーカーの actor。記録だけで、判定には使わない）。引けなければ空で、止めない。
-#
-# gh / glab はその道具が認証したアカウント、curl はトークンの持ち主。GitHub は GET /user の login、
-# GitLab は username。GitHub Actions の GITHUB_TOKEN のように持ち主の無いトークンは 403 で空になる。
-# 形（英数字と _ . - の 1〜100 字で、- で始まらない。実行ファイルの --actor と同じ）に合わなければ使わない。
-# マーカーに残すだけなので、長く待たない（account_max_time 秒）。gh / glab の標準エラーは応答に混ぜない。
-
-account_max_time="${CCNAVI_REVIEW_ACCOUNT_TIMEOUT:-15}"
-
-# timed <秒> <書き先> <コマンド>... 標準出力を書き先へ、標準エラーは捨てる。時間を過ぎたら止めて 1。
-timed() {
-	timed_limit="$1"
-	timed_out="$2"
-	shift 2
-	"$@" </dev/null >"$timed_out" 2>/dev/null &
-	timed_pid=$!
-	# sleep は背景で起こして wait で待つ。TERM を受けたら sleep も止めて抜ける（sleep を ppid 1 で残さない）。
-	(
-		exec </dev/null >/dev/null 2>&1
-		timed_sleep=""
-		timed_stop=""
-		# trap は印を立てて、分かっていれば sleep を止めるだけ。抜けるのは本流で、sleep の pid を控えた後に印を見る
-		# （sleep を起こした直後に TERM が来ても、sleep を残さない）。
-		trap 'timed_stop=1; test -z "$timed_sleep" || kill "$timed_sleep"' TERM
-		sleep "$timed_limit" &
-		timed_sleep=$!
-		test -z "$timed_stop" || { kill "$timed_sleep"; exit 0; }
-		wait "$timed_sleep"
-		test -z "$timed_stop" || exit 0
-		kill "$timed_pid"
-	) &
-	timed_dog=$!
-	timed_rc=0
-	wait "$timed_pid" 2>/dev/null || timed_rc=$?
-	kill "$timed_dog" 2>/dev/null || :
-	# 見張りの終了を回収して、シェルに「Terminated」の報告を出させない。
-	wait "$timed_dog" 2>/dev/null || :
-	return "$timed_rc"
-}
-
-account() {
-	if [ "$kind" = github ]; then field=login; else field=username; fi
-	account_out="$state/review-account-$$.json"
-	case "$transport" in
-	gh | glab) timed "$account_max_time" "$account_out" "$CLI" api --hostname "$host" user || : >"$account_out" ;;
-	curl)
-		ccnavi_h_max_time="$account_max_time"
-		api GET user >"$account_out" 2>/dev/null || : >"$account_out"
-		ccnavi_h_max_time=120
-		;;
-	esac
-	who=$("$JQ" -r --arg f "$field" '.[$f] // empty' <"$account_out" 2>/dev/null | tr -d '\r') || who=""
-	rm -f "$account_out"
-	[ -n "$who" ] || return 0
-	# 形は C ロケールで見る（ロケールによって [A-Za-z] が英字の外に当たらないように）
-	if printf '%s\n' "$who" | LC_ALL=C grep -q '[^A-Za-z0-9_.-]'; then return 0; fi
-	case "$who" in
-	-*) return 0 ;;
-	esac
-	[ "${#who}" -le 100 ] || return 0
-	printf '%s' "$who"
-}
-
-# ---- 取ってきた時点の状態。exe に渡す JSON。
-
-fetch_all() {
-	mr=$(find_mr)
-	[ -z "$mr" ] && fail no-mr "親ブランチ $branch に対応するマージリクエストが $host にありません。"
-	number=$(printf '%s' "$mr" | "$JQ" '.number')
-	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
-	# Draft のままか。`ready` の打ち直しの判断にだけ使うので、結果の JSON には入れず変数に覚える
-	# （`ready` が結果に足す。Chrome が組む結果と形を揃えたまま）。
-	mr_draft=$(printf '%s' "$mr" | "$JQ" -r '.draft // false')
-	# 実行ファイルに渡す形は番号と url だけ（元ブランチとマージ先は依頼のときだけ sh が確かめる）
-	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	t=$(threads "$number" "$url")
-	r=$(reviews "$number" "$url")
-	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson threads "$t" --argjson reviews "$r" \
-		'{host: $host, mr: $mr, threads: $threads, reviews: $reviews, fetched_at: (now | todate)}'
-}
-
-log_info 受け付けた -- "sub=$sub" "args=$#"
-log_debug 判定の材料 -- "sub=$sub" "kind=${kind:-}" "host=${host:-}" "branch=$branch" "transport=${transport:-}" "bin=${bin:-}"
-
-mkdir -p "$state"
-result="$state/review-result-$$.json"
+review_begin "$args_n"
 # 抜けるときに exe に渡した JSON を消し、終わりの 1 行を診断ログに残す。終了コードは変えない。
 # rm が失敗しても（JSON の置き場の名前がディレクトリ・権限など）、`set -e` がその失敗の値で抜けて
 # 元の終了コードを上書きしないよう、失敗を無視してから元の値で抜け直す。
 eli5_posted=""
-trap 'review_exit=$?; ccnavi_c1_end; rm -f "$result" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
-trap 'ccnavi_c1_end; exit 130' INT TERM HUP
+trap 'review_exit=$?; ccnavi_wap_end; rm -f "$result" "$result.re" ${eli5_posted:+"$eli5_posted"} 2>/dev/null || :; log_info 終わった -- "sub=$sub" "exit=$review_exit"; exit "$review_exit"' EXIT
+trap 'ccnavi_wap_end; exit 130' INT TERM HUP
 
-# ---- C1 と、ユーザの判断を送る承認の push
-ccnavi_c1_root="$root"
-ccnavi_c1_label=ccnavi-review
-ccnavi_c1_sh="$script_dir"
-ccnavi_c1_exe() { ccnavi "$@"; }
-c1_on=no
-
-# C1 を始める（1〜5）。<識別子>。対象でなければ何もしない（今の手元の動き）。止める理由があれば抜ける。
-c1_start() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
-	stop)
-		ccnavi_c1_refuse
-		exit 1
-		;;
-	yes)
-		ccnavi_c1_begin || exit 1
-		c1_on=yes
-		;;
-	esac
-	return 0
-}
-
-# 状態を書く実行ファイルの 1 回。C1 の中なら書いたパスだけをコミットして送る（6〜11）。
-# <文> -- <実行ファイルの引数>...。ccnavi_c1_capture に書き先があれば標準出力をそこへ書く。
-c1_ccnavi() {
-	c1_words="$1"
-	shift
-	[ "${1:-}" = "--" ] && shift
-	if [ "$c1_on" = yes ]; then
-		ccnavi_c1_write "ccnavi: ${c1_words}" -- "$@"
-	elif [ -n "$ccnavi_c1_capture" ]; then
-		ccnavi "$@" >"$ccnavi_c1_capture"
-	else
-		ccnavi "$@"
-	fi
-}
-
-# ユーザの判断をコミットして push する。取り込み済みの親子のチケットだけ、承認の push を <親> で呼ぶ。それ以外は今のまま何もしない。
-carry_human() {
-	ccnavi_c1_family "$1"
-	case "$ccnavi_c1_target" in
-	yes)
-		sh "$ccnavi_c1_sh/ccnavi-push-approved.sh" "$ccnavi_c1_family_id" || {
-			printf 'ccnavi-review: ユーザの判断は置いたが送れなかった。接続を戻して sh %s/ccnavi-push-approved.sh %s をユーザが再実行します（送るまで、この親子のチケットの状態の操作は止まる）\n' \
-				"$ccnavi_c1_sh" "$ccnavi_c1_family_id" >&2
-			return 1
-		}
-		;;
-	stop)
-		ccnavi_c1_refuse
-		return 1
-		;;
-	esac
-	return 0
-}
+review_wap
 
 case "$sub" in
 origin)
-	# origin をどう読んだか。当たらないときに、どこで読み違えたかを見るための出力。
+	# origin をどう読んだか。ヒットしないときに、どこで読み違えたかを見るための出力。
 	# URL に埋まった資格情報は伏せる（`ccnavi_mask_url` が作る `origin_shown`）。
 	# ここの出力はエージェントの文脈と記録に残る。
 	printf 'origin=%s\nkind=%s\nscheme=%s\nhost=%s\npath=%s\napi_base=%s\nbranch=%s\ntransport=%s\n' \
@@ -693,7 +493,7 @@ merged)
 	#                               分からなければそれぞれ空）
 	#   none                        終了コード 0（マージ済みの MR が無いと分かった）
 	#   unknown                     終了コード 3（API が失敗した・答えを読めなかった）。道具やトークンが無ければ、
-	#                               上の道具の選び方が 2 で止める（none は出さない）
+	#                               上の道具の選び方が 2 で止める
 	merged_number="${1:-}"
 	case "$merged_number" in
 	*[!0-9]*) fail merged-number "merged の MR の番号 (${merged_number}) は数字で渡してください。" 2 ;;
@@ -711,7 +511,7 @@ merged)
 				exit 3
 			}
 		else
-			answer=$(api GET "repos/$path/pulls?state=closed&head=$owner:$branch") || {
+			answer=$(api GET "repos/$path/pulls?state=closed&head=$(ccnavi_host_encode "$owner:$branch")") || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -736,7 +536,7 @@ merged)
 			}
 		else
 			# 全ページを読んでから絞る（フォークの MR で 1 ページ目が埋まっても見落とさない）
-			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$branch") || {
+			answer=$(pages "projects/$(encoded_path)/merge_requests?state=merged&source_branch=$(ccnavi_host_encode "$branch")") || {
 				printf 'unknown\n'
 				exit 3
 			}
@@ -759,9 +559,8 @@ confirm)
 		--actor | --actor=*) fail confirm-actor "confirm は --actor を受けない。マーカーに記すアカウントは、トークンの持ち主をホストに問い合わせて入れる。" 2 ;;
 		esac
 	done
-	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めない。前と同じマーカーになる）
-	actor=""
-	exe_knows --actor && actor=$(account || :)
+	# マーカーに残すアカウント。ロックを取る前に引く（引けなくても止めず、マーカーにアカウントを入れない）
+	actor=$(account || :)
 	log_debug マーカーのアカウント -- "actor=${actor:+set}"
 	[ -z "$actor" ] || set -- "$@" "--actor=$actor"
 	confirm_phase=""
@@ -773,10 +572,10 @@ confirm)
 		esac
 		confirm_prev="$a"
 	done
-	c1_start "$family"
+	wap_start "$family"
 	fetch_all >"$result"
-	c1_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
-	# done/ へ動いた子のワークツリーを消す（C1 なら送り終えた後。push の失敗で戻ったときに、レビュー待ちの子の
+	wap_ccnavi "$branch のレビュー済みを置いた" -- review confirm "$@" --result "$result"
+	# done/ へ動いた子のワークツリーを消す（write-and-push なら送り終えた後。push の失敗で戻ったときに、レビュー待ちの子の
 	# ワークツリーを残すため）。消せなかったもの（cwd が中・未コミット）は名指しされるだけで、confirm は成功のまま。
 	case "$confirm_phase" in
 	'' | *[!0-9]*) ;;
@@ -885,8 +684,8 @@ request)
 		fail explainer-unmet "ELI5 の HTML ($eli5) が依頼の前提を満たさない:${eli5_unmet}
 ${eli5_how}"
 	log_debug ELI5 を確かめた -- "eli5=set"
-	# 段 0: 取り込み済みの親子のチケットなら C1 の前半（ロック・取り込み）を先に済ませる。
-	c1_start "$family"
+	# 段 0: 取り込み済みの親子のチケットなら write-and-push の前半（ロック・取り込み）を先に済ませる。
+	wap_start "$family"
 	# 段 1: 前提。exe が依頼の本文を書き出す。
 	tell_skew
 	prepared=$(ccnavi review prepare "$@") || exit $?
@@ -900,19 +699,22 @@ ${eli5_how}"
 	mr_target=$(printf '%s' "$mr" | "$JQ" -r '.target // ""')
 	[ "$mr_source" = "$branch" ] ||
 		fail mr-source-mismatch "マージリクエストの元ブランチ（${mr_source:-不明}）がこのツリーの HEAD のブランチ（${branch}）と違う。依頼は作らずに止めた。"
-	mr_integration=$(default_branch)
+	mr_integration=$(default_branch) || exit "$?"
 	[ "$mr_target" = "$mr_integration" ] ||
 		fail mr-target-mismatch "マージリクエストのマージ先（${mr_target:-不明}）が統合先（${mr_integration}）ではない。依頼は作らずに止めた。マージ先を直すか、ユーザに相談してください。"
 	number=$(printf '%s' "$mr" | "$JQ" '.number')
 	url=$(printf '%s' "$mr" | "$JQ" -r '.url')
 	mr=$(printf '%s' "$mr" | "$JQ" -c '{number: .number, url: .url}')
-	# 段 2: 投稿。同じ目印（親・フェーズ・鍵）の依頼が既にあれば投稿し直さない（打ち直しや C1 の
+	# 段 2: 投稿。同じ目印（親・フェーズ・キー）の依頼が既にあれば投稿し直さない（打ち直しや write-and-push の
 	# やり直しで依頼を二重にしない）。
 	request_marker=$(head -n 1 "$file" | tr -d '\r')
 	posted=$(find_posted "$number" "$url" "$request_marker") ||
 		fail request-posted-unknown "投稿済みの依頼を確かめられなかった（ホストの返事は上に出ている）。二重に投稿しないよう止めた。"
 	if [ -n "$posted" ]; then
 		printf '同じ依頼は投稿済み（%s）。投稿し直さない\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
+		# 前の試みが結果を確定できないまま残っていても、ここで送り済みに直す（「引き継ぎ未完了」を残さない）
+		ccnavi ops mark-sent request "${branch:-}" "$number" "$request_marker" comment \
+			"$(printf '%s' "$posted" | "$JQ" -r '.url' | tr -d '\r')" >/dev/null 2>&1 || :
 	else
 		# 本文の末尾に、ELI5 の HTML の在りかと crit での見方を 1 行足す。HTML の中身は
 		# 載せない（マージリクエストの差分にある）。目印は 1 行目なので、足しても二重投稿の見分けは変わらない。
@@ -922,24 +724,29 @@ ${eli5_how}"
 			printf '\n---\n\nELI5（変更をやさしく説明した HTML）はこのマージリクエストの差分の `%s`。手元のチェックアウトのルートで `crit review %s` を開いてソースの行に指摘を付け、`crit push %s` でここに送ってください（送った指摘は行のスレッドになり、未解決の間はレビュー済みにならない。`crit %s` だけだと描画のプレビューになり、そこで付けたピンは送られない）。\n' \
 				"$eli5_rel" "$eli5_rel" "$number" "$eli5_rel"
 		} >"$eli5_posted"
-		posted=$(comment "$number" "$url" "$eli5_posted")
+		tell_skew
+		posted=$(comment_staged request "$request_marker" "$number" "$url" "$eli5_posted") ||
+			{
+				rm -f "$eli5_posted"
+				fail request-post-failed "依頼を投稿できたか確定できなかった（上の案内を見る）。マーカーは置いていない。確かめてから、同じコマンドを打ち直す。"
+			}
 		rm -f "$eli5_posted"
 	fi
 	"$JQ" -n --arg host "$kind" --argjson mr "$mr" --argjson posted "$posted" \
 		'{host: $host, mr: $mr} + $posted' >"$result"
 	# 段 3: マーカー。
-	c1_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
-	# 段 4: crit の案内。crit はユーザの手元で打つ道具で、ここからは起動しない（待ち続けるため）。
+	wap_ccnavi "$branch のレビューを依頼した" -- review requested "$@" --result "$result"
+	# 段 4: crit の案内。crit はユーザの手元で打つ道具。
 	# crit push は crit の作業場所（打った場所）からの相対で行を送るので、ワークツリーのルートで打たせる。
 	# crit・gh・glab が PATH に無くても止めない。案内だけ出す。
 	# ツリーの絶対パスはユーザの置き場なので字を絞れない。いつも '…' で包み、中の ' は '\'' に置き換える
 	# （打ったユーザのシェルで 1 語のまま、展開されない）。相対パスは上で字を絞ってあるので包まない。
 	eli5_shown="'$(printf '%s' "$eli5_top" | sed "s/'/'\\\\''/g")'"
 	eli5_rel_shown="$eli5_rel"
-	printf 'ELI5 を見る: ユーザが端末で cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない。このスクリプトは crit を起動しない）\n' \
+	printf 'ELI5 を見る: ユーザがターミナルで cd %s してから crit review %s を実行し、ソースの行に付けた指摘を crit push %s でマージリクエストに送る（描画は crit %s で見られるが、そこで付けたピンは送られない）\n' \
 		"$eli5_shown" "$eli5_rel_shown" "$number" "$eli5_rel_shown"
 	command -v crit >/dev/null 2>&1 ||
-		printf '（この環境の PATH に crit はありません。ユーザの手元の端末で実行します）\n'
+		printf '（この環境の PATH に crit はありません。ユーザの手元のターミナルで実行します）\n'
 	if [ "$kind" = github ]; then eli5_forge=gh; else eli5_forge=glab; fi
 	command -v "$eli5_forge" >/dev/null 2>&1 ||
 		printf '（この環境の PATH に %s はありません。crit push はユーザの手元で認証済みの %s を使う）\n' "$eli5_forge" "$eli5_forge"
@@ -965,139 +772,29 @@ comment)
 		printf '<!-- ccnavi:comment -->\n'
 		cat "$body"
 	} >"$noted"
-	posted=$(comment "$number" "$url" "$noted")
+	comment_key="@$body"
+	tell_skew
+	posted=$(comment_staged comment "$comment_key" "$number" "$url" "$noted") ||
+		{
+			rm -f "$noted"
+			fail comment-post-failed "コメントを投稿できたか確定できなかった（上の案内を見る）。確かめてから、同じコマンドを打ち直す。"
+		}
 	rm -f "$noted"
 	printf 'OK: 記録した（%s）\n' "$(printf '%s' "$posted" | "$JQ" -r '.url')"
 	;;
 decide)
-	# 残った指摘の行き先を、ユーザが指摘ごとに決める。形は 3 つ。
-	#   decide <N>                                   端末で 1 件ずつ選ぶ（ユーザが打つ）
-	#   decide <N> --preview                         見せる一覧を JSON で返す。何も置かない（ボードが読む）
-	#   decide <N> --choices <JSON> --digest <ダイジェスト>  ボードでユーザが押した選択を置く
-	# 最後の形は、エージェントが打つと組み込みの deny（builtin:guard-ticket-approval）が止める。
-	n="${1:-}"
-	case "$n" in
-	'' | *[!0-9]*) fail decide-no-phase "decide には <N>（フェーズ番号）が必要です。" 2 ;;
-	esac
-	# 下書きの名前は実行ファイルが整数で組む（`01` でも `1`）。揃えないと、書いた下書きを拾えない
-	n=$(printf '%s' "$n" | sed 's/^0*\([0-9]\)/\1/')
-	shift
-	preview=0
-	choices=""
-	digest=""
-	while [ "$#" -gt 0 ]; do
-		case "$1" in
-		--preview)
-			preview=1
-			shift
-			;;
-		--json) shift ;;
-		--choices | --digest)
-			[ "$#" -ge 2 ] || fail decide-no-value "decide の $1 には値が必要です。" 2
-			if [ "$1" = --choices ]; then choices="$2"; else digest="$2"; fi
-			shift 2
-			;;
-		*) fail decide-bad-option "decide は $1 を受けない。" 2 ;;
-		esac
-	done
-	if [ "$preview" -eq 1 ] && [ -n "$choices$digest" ]; then
-		fail decide-preview-conflict "decide の --preview と --choices / --digest は一緒に使えない。" 2
-	fi
-	if [ -n "$choices" ] || [ -n "$digest" ]; then
-		[ -n "$choices" ] && [ -n "$digest" ] || fail decide-choices-pair "decide の --choices と --digest は組で渡してください。" 2
-	fi
-	# マーカーに残すアカウント。confirm と同じくトークンの持ち主をホストに聞き、
-	# ロックを取る前に引く。引けなければ渡さず、マーカーも状態の履歴も前と同じ。見るだけの --preview は引かない。
-	# 経路は、ボードの押した選択（--choices）なら board、端末で選ぶ形なら terminal。
-	decide_who=""
-	if [ "$preview" -eq 0 ] && exe_knows --actor && exe_knows --via; then
-		decide_actor=$(account || :)
-		log_debug マーカーのアカウント -- "actor=${decide_actor:+set}"
-		if [ -n "$decide_actor" ]; then
-			if [ -n "$choices" ]; then decide_via=board; else decide_via=terminal; fi
-			decide_who="--actor=$decide_actor --via=$decide_via"
-		fi
-	fi
-	# 見るだけの --preview は何も書かないので C1 にしない。端末で選ぶ形は、選ぶのを C1 の外で先に
-	# 済ませる（ロックを持ったままユーザを待たない）ので、ここでは始めない。
-	[ "$preview" -eq 1 ] || [ -z "$choices" ] || c1_start "$family"
+	# 残った指摘の一覧を JSON で返す。何も置かない（ボードとエージェントが読む）。
+	# 引数は上で確かめた（--preview だけ。選んだものを置く形は ccnavi-user-decide.sh）。
 	fetch_all >"$result"
-	if [ "$preview" -eq 1 ]; then
-		ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
-		exit $?
-	fi
-	if [ -n "$choices" ]; then
-		# 失敗の答え（見せた指摘と今の指摘が違う、など）も JSON で返すので、先に出してから終わる。
-		tell_skew
-		ccnavi_c1_capture="$state/review-decide-$$.out"
-		decide_rc=0
-		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
-			decide_rc=$?
-		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-		rm -f "$ccnavi_c1_capture"
-		ccnavi_c1_capture=""
-		[ "$decide_rc" -eq 0 ] || {
-			printf '%s\n' "$out"
-			exit 1
-		}
-		post_decision "$n"
-		printf '%s' "$out" | "$JQ" -c --arg u "$issue_url" --arg w "$post_warning" '. + {issue_url: $u, warning: $w}'
-		exit 0
-	fi
-	ccnavi_c1_family "$family"
-	case "$ccnavi_c1_target" in
-	stop)
-		ccnavi_c1_refuse
-		exit 1
-		;;
-	yes)
-		# 1. ユーザが端末で選ぶ（何も置かない。選択とダイジェストを state の置き場に書くだけ）。
-		chosen="$state/review-choose-$$.json"
-		ccnavi --reviewed "$n" --accept-unresolved --choose-out "$chosen" --result "$result" || {
-			rm -f "$chosen"
-			exit 1
-		}
-		choices=$("$JQ" -c '.choices' "$chosen") && digest=$("$JQ" -r '.digest' "$chosen") || {
-			rm -f "$chosen"
-			fail decide-choose-unreadable "選んだものを読めない（${chosen}）。" 1
-		}
-		rm -f "$chosen"
-		# 2. C1 の中で、選んだものを置く（`--yes`。見せた指摘と今の指摘のダイジェストが同じときだけ）。
-		ccnavi_c1_begin || exit 1
-		c1_on=yes
-		ccnavi_c1_capture="$state/review-decide-$$.out"
-		decide_rc=0
-		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		c1_ccnavi "$branch のフェーズ $n の指摘の行き先を決めた" -- \
-			--reviewed "$n" --accept-unresolved --yes "$choices" --digest "$digest" --json --result "$result" $decide_who ||
-			decide_rc=$?
-		out=$(cat "$ccnavi_c1_capture" 2>/dev/null || :)
-		rm -f "$ccnavi_c1_capture"
-		ccnavi_c1_capture=""
-		if [ "$decide_rc" -ne 0 ]; then
-			[ -z "$out" ] || printf '%s\n' "$out"
-			exit 1
-		fi
-		printf 'OK: フェーズ %s の指摘の行き先を置いて送った（%s）\n' "$n" "$out"
-		;;
-	*)
-		# shellcheck disable=SC2086 # decide_who は空か --actor=<形を確かめた名前> --via=<語> の 2 語
-		ccnavi --reviewed "$n" --accept-unresolved --result "$result" $decide_who
-		;;
-	esac
-	post_decision "$n"
-	[ -n "$issue_url" ] && printf 'issue に回した: %s\n' "$issue_url"
-	[ -n "$post_warning" ] && printf 'ccnavi-review: %s\n' "$post_warning" >&2
-	:
+	ccnavi --reviewed "$n" --accept-unresolved --preview --json --result "$result"
+	exit $?
 	;;
 ready)
 	# 親を閉じられる状態なら Draft を外す。exe が条件を確かめてマーカーとコメントの下書きを置き、
-	# 閉じた親子のチケット（done/ の親子・phases/<親>/・events/・flows/）を手元の logs/archive/ へ
-	# 退避する（git の上では削除）。C1 の中なら、その削除をコミットして push してから、ここが外して
+	# 閉じた親子のチケット（done/ の親子・phases/<親>/・flows/）を手元の logs/archive/ へ
+	# 退避する（git の上では削除）。write-and-push の中なら、その削除をコミットして push してから、ここが外して
 	# コメントを投稿する。マージはユーザ（squash。既定のブランチにチケットを残さない）。
-	c1_start "$family"
+	wap_start "$family"
 	fetch_all >"$result"
 	# 打ち直しの判断（Draft を外し損ねたか）に、MR がまだ Draft かを結果に足す。
 	"$JQ" --argjson d "${mr_draft:-false}" '.mr.draft = $d' "$result" >"$result.draft" && mv -f "$result.draft" "$result"
@@ -1108,16 +805,16 @@ ready)
 	if [ -n "${skew:-}" ]; then
 		printf 'ccnavi-review: 食い違いがあっても ready は続ける。エージェントは build.py を実行せず、終わったらユーザに実行ファイルの組み立て直し（または配り直し）を頼む。\n' >&2
 	fi
-	ccnavi_c1_capture="$state/review-ready-$$.out"
+	ccnavi_wap_capture="$state/review-ready-$$.out"
 	ready_rc=0
-	c1_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
+	wap_ccnavi "$branch の Draft を解除するマーカーを置いた" -- review ready --result "$result" || ready_rc=$?
 	# 実行ファイルの標準出力は、1 行目が下書きのパス、2 行目が `tree <退避したツリーのルート>`。
 	# wip/ から消したものがあれば、続けて `wip-from <消す前の HEAD>` と `wip <パス>`（1 行 1 本）。
-	noted=$(sed -n '1p' "$ccnavi_c1_capture" 2>/dev/null || :)
-	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_c1_capture" 2>/dev/null | head -n 1)
-	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_c1_capture" 2>/dev/null || :)
-	rm -f "$ccnavi_c1_capture"
-	ccnavi_c1_capture=""
+	noted=$(sed -n '1p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	wip_from=$(sed -n 's/^wip-from //p' "$ccnavi_wap_capture" 2>/dev/null | head -n 1)
+	wip_gone=$(sed -n 's/^wip //p' "$ccnavi_wap_capture" 2>/dev/null || :)
+	rm -f "$ccnavi_wap_capture"
+	ccnavi_wap_capture=""
 	[ "$ready_rc" -eq 0 ] || exit "$ready_rc"
 	if [ -n "$wip_gone" ]; then
 		printf 'wip/ の追跡済みのファイルを削除しました（%s 件。削除する前のコミット %s から戻せる）:\n' \
@@ -1129,9 +826,13 @@ ready)
 	still=$(undraft "$number")
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
-		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
+		comment_staged ready ready "$number" "$url" "$noted" >/dev/null ||
+			fail ready-comment-failed "Draft の解除は完了。補助のコメントは未完了（${url}）。確かめてから ready を打ち直すと、コメントだけ送り直す。"
+		rm -f "$noted"
 	fi
 	printf 'OK: Draft を解除した（%s）。マージはユーザが行う\n' "$url"
+	# 親を閉じる片付け: この親の送り終わった操作記録を消す（未完了のものは残す）
+	ccnavi ops retire "${branch:-}" >/dev/null 2>&1 || :
 	# 最後に子と親の片付けをする（`worktree retire`）。Draft を外す前には消さない（ready を打ち直せなくなる）。
 	# 閉じた子のワークツリー（レビュー待ちだったものも）、子の手元のブランチ（合流した子は条件を確かめて削除。
 	# 取り消した子は一覧を出すだけで、ユーザの確認が取れてから消す）、親のワークツリーの順。未コミットの変更や
@@ -1146,49 +847,5 @@ ready)
 	# 親と名前が違うワークツリーや、下書きがあって消されなかった子のワークツリーは、drop では消えない。
 	# 一覧を出すだけで消さない（消すかどうかはユーザが決める）。残りが無ければ何も出ない。
 	ccnavi worktree remaining "$family" || :
-	;;
-close-early)
-	# ユーザが端末で打つ。exe が残りを見せて y/N を取り、マーカーを置いて下書きを書く。
-	# ここが残りを issue に書き出し、コメントを投稿する。Draft を外すのは、親が片付けて
-	# push したあとの ready（外す経路は 1 本）。
-	reason=""
-	make_issue=1
-	while [ "$#" -gt 0 ]; do
-		case "$1" in
-		--reason)
-			reason="${2:-}"
-			shift 2
-			;;
-		--no-issue)
-			make_issue=0
-			shift
-			;;
-		*) shift ;;
-		esac
-	done
-	[ -n "$reason" ] || fail close-early-no-reason "close-early には --reason <理由> が必要です。" 2
-	fetch_all >"$result"
-	# exe はユーザに残りを見せて y/N を取るので、標準出力は端末のまま。下書きは state の
-	# 置き場の決まった名前で拾う（親の識別子。ブランチ名と違うことがある）。
-	ccnavi --close-early --reason "$reason" --result "$result" || exit $?
-	issue_draft="$state/review-close-early-issue-$family.md"
-	noted="$state/review-close-early-note-$family.md"
-	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
-	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-	if [ "$make_issue" -eq 1 ] && [ -f "$issue_draft" ]; then
-		issue=$(create_issue "$issue_draft")
-		[ -z "$issue" ] && fail issue-create-failed "残りを書き出す issue を作れなかった。下書きは $issue_draft にある。"
-		issue_url=$(printf '%s' "$issue" | "$JQ" -r '.url')
-		issue_no=$(printf '%s' "$issue" | "$JQ" -r '.number')
-		printf '残りを #%s に書き出した（%s）\n' "$issue_no" "$issue_url"
-		printf '残りは #%s へ: %s\n' "$issue_no" "$issue_url" >>"$noted"
-		rm -f "$issue_draft"
-	fi
-	if [ -f "$noted" ]; then
-		comment "$number" "$url" "$noted" >/dev/null && rm -f "$noted"
-	fi
-	# 取り込み済みの親子のチケットなら、早めに閉じたマーカー（ユーザの判断）を承認の push で送る。
-	carry_human "$family" || exit 1
-	printf 'OK: 早めに閉じた（%s）。あとは親に、閉じて片付けて push し、ready を打たせてください。マージはユーザが行う\n' "$url"
 	;;
 esac

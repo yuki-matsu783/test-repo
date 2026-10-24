@@ -4,14 +4,8 @@
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前>
 #   sh .ccnavi/scripts/ccnavi-clean.sh <名前> --dry-run
 #   sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
-#   sh .ccnavi/scripts/ccnavi-clean.sh --branch <子の識別子> [--confirmed]
 #
-# --branch は、親を閉じたときに ccnavi が片付ける子として記録した手元のブランチを、条件を確かめ直して消す
-# 入口（中身は実行ファイルの `worktree branch`）。合流した子は、ブランチの先頭が合流した先頭と同じで、それが
-# push 済みの親に含まれるときだけ消える。取り消した子は --confirmed（ユーザが消してよいと言った）が要る。
-# 記録に無いブランチと、チケットの parent: で記録の親の子と確かめられないブランチは消さない。
-# `git branch -D` を直に打たせないための入口で、--branch はユーザが先頭に ! を付けて打つ
-# （エージェントからは hook が止める。--confirmed を単なる語として添えて確認を飛ばさせないため）。
+# 親を閉じたときに残した子の手元のブランチを消す入口は、ユーザ専用の ccnavi-user-clean-branch.sh。
 #
 # --worktree は生成物の掃除と `git worktree remove`（--force なし）を 1 本で行う。ccnavi が ready の
 # 最後や confirm の後に消せなかったワークツリー（cwd が中にあった、など）を、外から消し直すための入口。
@@ -23,7 +17,7 @@
 # 先に生成物だけを消しておく。
 #
 # <名前> は .claude/worktrees/ の直下のディレクトリの名前。パスは受け付けない。
-# `rm -rf` の代わりに任意の場所を消す手段にしないためで、ccnavi の recursive-delete の
+# `rm -rf` の代わりに任意の場所を消す手段にしないためで、ccnavi の builtin:recursive-delete の
 # 趣旨（消す対象を名指しする）に合わせてある。
 #
 # 消すのは、作り直せば戻る決まった名前のディレクトリだけ。何を消すかと消し方は
@@ -47,11 +41,8 @@ usage() {
 	cat <<'USAGE'
 sh .ccnavi/scripts/ccnavi-clean.sh <名前> [--dry-run]
 sh .ccnavi/scripts/ccnavi-clean.sh --worktree <名前>
-sh .ccnavi/scripts/ccnavi-clean.sh --branch <子の識別子> [--confirmed]
 
   <名前>      .claude/worktrees/ の直下の名前。パスは書けない
-  --branch    親を閉じたときに片付ける子として記録した手元のブランチを、条件を確かめて削除します。
-              取り消した子は --confirmed（ユーザが確認した）が要る。ユーザが ! を付けて打つ
   --dry-run   削除するものを並べるだけで、削除しない
   --worktree  生成物を削除してから、ワークツリーそのものも削除します（git worktree remove。--force なし）。
               cwd がその中なら削除しません。ブランチは残す。このときの <名前> はチケットの識別子
@@ -65,8 +56,6 @@ USAGE
 name=""
 dry=""
 whole=""
-branch=""
-confirmed=""
 for arg in "$@"; do
 	case "$arg" in
 	-h | --help | help)
@@ -79,14 +68,8 @@ for arg in "$@"; do
 	--worktree)
 		whole=1
 		;;
-	--branch)
-		branch=1
-		;;
-	--confirmed)
-		confirmed=1
-		;;
 	-*)
-		printf 'ccnavi-clean: %s は使用できません。使えるのは --dry-run・--worktree・--branch・--confirmed だけです。\n' "$arg" >&2
+		printf 'ccnavi-clean: %s は指定できません。指定できるのは --dry-run・--worktree だけです。\n' "$arg" >&2
 		exit 2
 		;;
 	*)
@@ -116,31 +99,11 @@ root=$(ccnavi_workspace) || {
 	exit 2
 }
 
-if [ -n "$confirmed" ] && [ -z "$branch" ]; then
-	printf 'ccnavi-clean: --confirmed は --branch と一緒に使います。\n' >&2
-	exit 2
-fi
-if [ -n "$branch" ]; then
-	if [ -n "$whole" ] || [ -n "$dry" ]; then
-		printf 'ccnavi-clean: --branch は --worktree・--dry-run と一緒に使えません。\n' >&2
-		exit 2
-	fi
-	here="$(pwd -W 2>/dev/null || pwd)"
-	if bin=$(ccnavi_bin "$root"); then
-		exec "$bin" --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
-	elif [ -f "$root/src/ccnavi/__main__.py" ]; then
-		cd "$root"
-		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree branch "$name" ${confirmed:+confirmed}
-	fi
-	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
-	exit 2
-fi
-
 # --worktree: 掃除とワークツリーの削除を実行ファイルに任せる（cwd の確かめ・未コミットの確かめ・
 # 生成物の掃除・worktree remove）。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if [ -n "$whole" ]; then
 	if [ -n "$dry" ]; then
-		printf 'ccnavi-clean: --worktree と --dry-run は一緒に使えません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
+		printf 'ccnavi-clean: --worktree と --dry-run は同時に指定できません（削除するものを見るだけなら --dry-run だけで実行します）。\n' >&2
 		exit 2
 	fi
 	here="$(pwd -W 2>/dev/null || pwd)"
@@ -150,7 +113,7 @@ if [ -n "$whole" ]; then
 		cd "$root"
 		exec uv run python -m ccnavi --root "$root" --cwd "$here" worktree drop "$name"
 	fi
-	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
+	printf 'ccnavi-clean: ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。\n' >&2
 	exit 2
 fi
 
@@ -194,7 +157,7 @@ clean_with_sh() {
 '
 	# find の出力は行で読む。名前に改行があると行の切れ目を取り違え、名前の途中から
 	# 始まる行がワークツリーの外（`../` で始まるパス）を指しかねない。1 つでもあれば
-	# 何も消さない。消す対象の中（node_modules など）は丸ごと消すので見ない。
+	# 何も消さない。調べるのは消す対象の外だけ（中の node_modules などは中身ごと消す）。
 	cw_odd=$(cd "$cw_top" && {
 		find . -name .git -prune \
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) -prune \
@@ -209,7 +172,7 @@ clean_with_sh() {
 	fi
 
 	# 決まった名前はそこで降りるのをやめる（-prune）。out は package.json の隣かどうかを
-	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は捨てる）。
+	# 後で見るので、ここでは降りる。読めないディレクトリは探さない（find のエラー出力は破棄する）。
 	cw_found=$(cd "$cw_top" && {
 		find . -name .git -prune \
 			-o \( -name node_modules -o -name .venv -o -name __pycache__ -o -name .pytest_cache -o -name .ruff_cache \) \
@@ -297,7 +260,7 @@ $cw_targets
 EOF
 
 	if [ -n "$cw_failed" ]; then
-		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。\n' >&2
+		printf 'ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）はどのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で .claude/worktrees/ の外へ出し、`git worktree prune` を打ってください。\n' >&2
 		return 1
 	fi
 	return 0

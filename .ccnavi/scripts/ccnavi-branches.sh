@@ -1,5 +1,5 @@
 #!/bin/sh
-# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、作業ツリーにも git にも書かない。
+# ccnavi-branches issue・MR に紐づくブランチを探す。読むだけで、ワークツリーにも git にも書かない。
 #
 #   sh .ccnavi/scripts/ccnavi-branches.sh --issue <番号> [--json]
 #   sh .ccnavi/scripts/ccnavi-branches.sh --mr <番号> [--json]
@@ -94,7 +94,7 @@ state="$root/logs/state" # 固定
 mkdir -p "$state" 2>/dev/null || fail no-state "state の置き場（${state}）を作れません。" 2
 result="$state/branches-host-$$.json"
 host_err="$state/branches-host-err-$$"
-trap 'rm -f "$result" "$host_err"' EXIT
+trap 'rm -f "$result" "$host_err" "$host_err.status" "$host_err.body"' EXIT
 
 # ---- 実行ファイル。見つからなければソース（ccnavi のリポジトリ）で動かす。
 if bin=$(ccnavi_bin "$root"); then
@@ -103,7 +103,7 @@ if bin=$(ccnavi_bin "$root"); then
 elif [ -f "$root/src/ccnavi/__main__.py" ]; then
 	ccnavi() { (cd "$root" && uv run python -m ccnavi --root "$root" --cwd "$here" "$@"); }
 else
-	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_BIN_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/ のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
+	fail no-bin "ccnavi の実行ファイルが見つかりません（CCNAVI_ENTRY_PATH・dist/ccnavi/ccnavi・.ccnavi/bin/・PATH のどれにもありません）。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してください。" 2
 fi
 
 # ---- ホスト。読めなければ理由を書いて、手元の候補だけにする。
@@ -119,14 +119,23 @@ unchecked() {
 	log_info ホストを見ていない -- "kind=$kind" "reason=$2"
 }
 
-# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。ホストの返事は書き出さない。
+# API が失敗したら、どの呼び出しかを覚えておく（`$( )` の中から呼ばれるのでファイルに書く）。
 host_api_failed() {
 	printf '%s %s' "$1" "$2" >"$host_err"
+	# ホストが HTTPのエラーを返したときは、その番号と本文（先頭200文字、1行）も残す
+	ccnavi_host_fail_status "$3" >"$host_err.status"
+	ccnavi_host_fail_body "$3" >"$host_err.body"
 }
 
 api_failed_reason() {
 	what=$(cat "$host_err" 2>/dev/null || :)
-	printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
+	af_status=$(cat "$host_err.status" 2>/dev/null || :)
+	af_body=$(cat "$host_err.body" 2>/dev/null || :)
+	if [ -n "$af_status" ]; then
+		printf 'ホストの API が失敗した（%s）。HTTP %s: %s' "${what:-?}" "$af_status" "${af_body:-（本文なし）}"
+	else
+		printf 'ホストの API が失敗した（%s）。番号が無いか、権限が足りないか、ホストに届かない' "${what:-?}"
+	fi
 }
 
 # write_checked <mrs の JSON 配列> 見た結果を書く。
@@ -185,7 +194,7 @@ look_at_host() {
 	fi
 	origin_shown=$(ccnavi_mask_url "$origin")
 	if ! ccnavi_host_parse "$origin"; then
-		unchecked "origin の URL を読めない（${origin_shown}）" origin-unreadable
+		unchecked "origin の URL を読めない（${origin_shown}）${ccnavi_h_parse_why:+。$ccnavi_h_parse_why}" origin-unreadable
 		return 0
 	fi
 	connect_rc=0
@@ -197,11 +206,11 @@ look_at_host() {
 		return 0
 		;;
 	4)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません" no-transport-token
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で利用できず（未導入か未認証）、curl に付ける $ccnavi_h_token_name もありません" no-transport-token
 		return 0
 		;;
 	*)
-		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で使えず、curl もありません" no-transport
+		unchecked "$ccnavi_h_cli_name が $ccnavi_h_host で利用できず、curl もありません" no-transport
 		return 0
 		;;
 	esac
@@ -224,5 +233,5 @@ look_at_host
 # ---- 手元の候補と合わせて出す（実行ファイル）。
 set -- branches "$kind" "$number" --result "$result"
 [ -z "$json" ] || set -- "$@" --json
-ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください。古い実行ファイルは branches に未対応なので、組み立て直すか配り直してください）。" 1
+ccnavi "$@" || fail exe-failed "実行ファイルが候補を出せなかった（上の文面を見てください）。" 1
 log_info 候補を出した -- "kind=$kind"

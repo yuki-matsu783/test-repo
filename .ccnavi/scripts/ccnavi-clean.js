@@ -45,7 +45,7 @@ function findTargets(top) {
 		try {
 			entries = fs.readdirSync(dir, { withFileTypes: true });
 		} catch {
-			continue; // 読めないディレクトリは探さない。消すものを増やす方向にはしない
+			continue; // 読めないディレクトリは飛ばす（消す対象を増やさない方を選ぶ）
 		}
 		const hasPackageJson = entries.some((e) => e.isFile() && e.name === "package.json");
 		for (const e of entries) {
@@ -99,7 +99,7 @@ function main(argv) {
 		console.error(
 			"ccnavi-clean: 消し残しがあります。Windows では、読み込まれている DLL（uv の .venv の .pyd）は" +
 				"どのワークツリーからも削除できません。テストが終わるのを待って再実行するか、ディレクトリごと mv で" +
-				" .claude/worktrees/ の外へ出してください（README.md の「実測で分かった落とし穴」）。",
+				" .claude/worktrees/ の外へ出し、`git worktree prune` を打ってください。",
 		);
 		return 1;
 	}
