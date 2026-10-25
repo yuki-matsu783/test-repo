@@ -18,6 +18,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "index.html"
+started_at: "2026-10-25T04:05:32+0000"
+base_sha: "9a036b2f5d9f28d9fdc4ef9418f3927f37e637d9"
 ---
 ## 目的
 
