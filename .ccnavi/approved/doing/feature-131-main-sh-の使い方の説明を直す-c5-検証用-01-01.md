@@ -7,6 +7,8 @@ title: "main.sh の先頭コメントの使い方の説明を実装に合わせ�
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:23:46+0000"
+base_sha: "7b5e6c271239941933bf8f3e057a22be8844772e"
 ---
 ## 目的
 
