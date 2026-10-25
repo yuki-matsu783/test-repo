@@ -1,4 +1,4 @@
 version: 1
-levels: {medium: 20, high: 40, critical: 70}
+levels: {medium: 70, high: 40, critical: 20}
 factors:
-  - {id: learn-glob, points: 30, glob: "wip/handoff/learnings/*", max: 35, message: 学びの記録に触れた}
+  - {id: any-change, points: 45, lines_over: 1, message: 変更あり}
