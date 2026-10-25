@@ -19,6 +19,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T08:14:38+0000"
+base_sha: "8cc972b2ae4e817d95f1c5fec6bf1ad83b9c119b"
 ---
 ## 目的
 
