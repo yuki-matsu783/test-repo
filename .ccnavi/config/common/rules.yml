@@ -86,6 +86,26 @@ deny:
       ヒアドキュメントで書いたファイルは、Write / Edit に掛かる権限の宣言も、
       編集後に走る検査も、どちらも通りません。
 
+  # --- 検証用ルール（t-）
+  - id: t-no-pip
+    match: Bash
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+pip3?(\.exe)?\s+install\b'
+    message: >-
+      pip install は使いません。依存は requirements.txt に書いて、導入はユーザに依頼してください。
+  - id: t-no-index-edit
+    match: Write|Edit
+    glob: "*/index.html"
+    message: >-
+      index.html は生成物なので直接は直しません。元の main.sh を直して、index.html はユーザに作り直しを依頼してください。
+  - id: t-no-verify
+    match: Bash
+    when:
+      all:
+        - glob: "*ccnavi-git.sh*commit*"
+        - glob: "*--no-verify*"
+    message: >-
+      --no-verify でコミットしません。検査が落ちたなら原因を直してから、通常のコミットをしてください。
+
 ask:
   # 直接作業の取り込み先・状態の了承・横で作業する指定・引き取りは、ユーザの確認ダイアログに出す。
   # ダイアログのコマンドに、取り込み先のブランチ名と選んだ指定が見える。
@@ -124,7 +144,18 @@ ask:
       WebFetch なら取得がツールの呼び出しとして残り、どこから来た文字列かが
       あとから辿れます。
 
+  - id: t-ask-readme
+    match: Write|Edit
+    glob: "*/README.md"
+    additionalContext: >-
+      README.md はユーザが変更内容を確認する。何を足す・変えるかを先に 1 行で言うこと。
+
 allow:
+  - id: t-main-date
+    match: Write|Edit
+    glob: "*/main.sh"
+    additionalContext: >-
+      main.sh を直したら、2 行目の set -eu の直後に「# 更新日: YYYY-MM-DD」の行を足すか書き換える。
   # 書き込みを許すのはワークツリーの中だけ。ワークスペースルートの側は deny の workspace-root が止める。
   # ワークツリーの中でも hook・スクリプト・settings.json などは deny が先にヒットする。
   - id: worktrees
