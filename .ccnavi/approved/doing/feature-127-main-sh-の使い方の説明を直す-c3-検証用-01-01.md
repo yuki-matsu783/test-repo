@@ -7,6 +7,8 @@ phase: 1
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:14:52+0000"
+base_sha: "b5f51a349d4bcefa8e8f1fd77a9a8e286a251931"
 ---
 ## 目的
 
