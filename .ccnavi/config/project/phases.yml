@@ -1,0 +1,10 @@
+version: 1
+
+phases:
+  # 作業の振り返りで出たスキルの候補を、.claude/skills/ に配置する。根拠の wiki も同じ子で直す。
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope: [".claude/skills/*", "docs/wiki/*"]
+    when: 振り返りでスキルの候補が出たとき。候補が無ければ置かない
