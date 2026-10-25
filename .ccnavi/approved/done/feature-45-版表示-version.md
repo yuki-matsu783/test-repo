@@ -24,6 +24,8 @@ allow:
 started_at: 2026-10-25T00:52:47+0000
 base_sha: 2fb1c2fde289b4821cc21431081135c12f713659
 feedback: []
+completed_at: "2026-10-25T00:58:27+0000"
+finished_to: "done"
 ---
 ## 目的
 
