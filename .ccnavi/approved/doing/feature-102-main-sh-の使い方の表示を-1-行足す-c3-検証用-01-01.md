@@ -7,6 +7,8 @@ title: "main.sh の使い方の表示に出力先を 1 行足す（フェーズ 
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T08:09:21+0000"
+base_sha: "13819ba24453ab7028629e2533a75f11f000b39d"
 ---
 ## 目的
 
