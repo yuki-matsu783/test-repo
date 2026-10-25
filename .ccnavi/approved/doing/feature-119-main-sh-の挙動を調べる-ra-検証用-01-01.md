@@ -12,6 +12,8 @@ deliverables: ["wip/research/summary.md"]
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T09:53:45+0000"
+base_sha: "70bd561a1c9d40ad49f819f21c62765ac83ec89e"
 ---
 `main.sh` の挙動を調べ、結果を `wip/research/summary.md` にまとめる。
 
