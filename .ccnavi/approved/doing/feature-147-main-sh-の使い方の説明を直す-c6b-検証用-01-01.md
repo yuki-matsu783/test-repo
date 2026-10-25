@@ -7,6 +7,8 @@ title: "main.sh の先頭コメントに、上書きと空出力の動作を書�
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:59:51+0000"
+base_sha: "a4dda527122b0220e3024cef3a156cc788cccab9"
 ---
 ## 目的
 
