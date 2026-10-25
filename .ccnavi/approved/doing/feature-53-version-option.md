@@ -3,7 +3,7 @@ version: 1
 ticket: feature-53-version-option
 issue: 53
 mr: 56
-title: "main.sh に --version オプションを足す（ccnavi 検証 T3）"
+title: main.sh に --version オプションを足す（ccnavi 検証 T3）
 phases:
   quick-work:
     kind: work
@@ -12,15 +12,19 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  issue #53 は main.sh に --version を足し、「0.1.0」を表示することを求めている。
+- quick-work
+rationale: 'issue #53 は main.sh に --version を足し、「0.1.0」を表示することを求めている。
+
   変更は main.sh の一箇所だけで、設計判断も並行作業も要らないので quick-work にする。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "main.sh"
-started_at: "2026-10-25T04:28:28+0000"
-base_sha: "889ad195f5080698aee1653655a73d9767e7f406"
+- match: Write|Edit
+  glob: main.sh
+- match: Write|Edit
+  glob: README.md
+started_at: 2026-10-25T04:28:28+0000
+base_sha: 889ad195f5080698aee1653655a73d9767e7f406
 ---
 ## 目的
 
