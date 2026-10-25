@@ -1,4 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: script-main, points: 0, script: .ccnavi/config/common/scripts/risk-main.sh, message: main.sh を触るスクリプトの点}
+  - {id: fixed, points: 50, script: .ccnavi/config/common/scripts/fixed.sh, message: 固定の点}
