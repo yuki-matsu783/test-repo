@@ -1,0 +1,6 @@
+name: feature
+description: 新機能を設計してから実装する（プロジェクト版）
+when: 新しい機能を足すとき
+plan:
+  - design
+  - {type: implement, after: [1]}

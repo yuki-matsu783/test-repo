@@ -1,5 +1,0 @@
-name: legacy
-description: 廃止した型を使う古いテンプレート
-when: 古い作業のとき
-plan:
-  - old-kind
