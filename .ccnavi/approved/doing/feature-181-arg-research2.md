@@ -3,7 +3,7 @@ version: 1
 ticket: feature-181-arg-research2
 issue: 181
 mr: 182
-title: "main.sh の引数と終了コードの調査 (T7b)"
+title: main.sh の引数と終了コードの調査 (T7b)
 phases:
   research:
     kind: work
@@ -15,15 +15,18 @@ phases:
     - wip/research/summary.md
     when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
 plan:
-  - research
-rationale: |
-  main.sh は引数と終了コードをヘッダのコメントで説明しているが、そのとおりに動くかは実行で確かめていない。
+- research
+rationale: 'main.sh は引数と終了コードをヘッダのコメントで説明しているが、そのとおりに動くかは実行で確かめていない。
+
   まず実際の振る舞いを調べ、コメントとの食い違いを記録してから、直すかどうかを決めたい。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "wip/research/*"
-started_at: "2026-10-25T18:23:39+0000"
-base_sha: "cf1c983d90d1e51e5f9a02104f7e66d8fe6c3d32"
+- match: Write|Edit
+  glob: wip/research/*
+started_at: 2026-10-25T18:23:39+0000
+base_sha: cf1c983d90d1e51e5f9a02104f7e66d8fe6c3d32
+feedback: []
 ---
 ## 目的
 
