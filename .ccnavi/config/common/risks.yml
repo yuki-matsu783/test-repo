@@ -1,5 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: a, points: 99, script: .ccnavi/config/common/scripts/a.sh, message: 項目 a}
-  - {id: b, points: 99, script: .ccnavi/config/common/scripts/b.sh, message: 項目 b}
+  - {id: learn-glob, points: 30, glob: "wip/handoff/learnings/*", max: 35, message: 学びの記録に触れた}
