@@ -65,6 +65,8 @@ allow:
     glob: "tests/*"
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:43:32+0000"
+base_sha: "917212a9109b938dae55c461c1bf9401c8abf1a8"
 ---
 ## 目的
 
