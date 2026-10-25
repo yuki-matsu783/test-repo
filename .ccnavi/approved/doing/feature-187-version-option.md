@@ -26,6 +26,8 @@ allow:
     glob: "docs/wiki/*"
   - match: Write|Edit
     glob: ".claude/skills/*"
+started_at: "2026-10-25T21:58:29+0000"
+base_sha: "1e4c2ebcbcd8846ce07095b1b1008c8977a77a92"
 ---
 ## 目的
 
