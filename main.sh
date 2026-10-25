@@ -18,6 +18,10 @@ set -eu
 # 例:
 #   sh main.sh access.log ERROR errors
 #   → access.log から ERROR を含む行を取り、番号を振って errors.txt に書く
+#   sh main.sh access.log "" all
+#   → access.log の全行を取り、番号を振って all.txt に書く（パターンが空文字なら全行）
+#   sh main.sh access.log WARN warn-log
+#   → access.log から WARN を含む行を取り、番号を振って warn-log.txt に書く
 main() {
   if [ "$#" -lt 3 ]; then
     echo "使い方: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>" >&2
