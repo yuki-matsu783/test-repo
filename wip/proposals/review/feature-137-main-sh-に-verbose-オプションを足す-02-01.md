@@ -9,6 +9,9 @@ allow:
     glob: "wip/design/*"
 started_at: "2026-10-25T10:58:25+0000"
 base_sha: "475249e19e9c544f81468194ec02cb1ef76fcd67"
+completed_at: "2026-10-25T11:02:40+0000"
+merged_sha: "da28378420d9d8dcec2bdd048a3045df7220deb2"
+finished_to: "review"
 ---
 ## 目的
 
