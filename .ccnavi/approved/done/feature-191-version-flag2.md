@@ -41,6 +41,8 @@ started_at: 2026-10-25T22:13:34+0000
 base_sha: fd45556075c68f250ace68989f1f0e5844c2cadd
 feedback:
 - skill-improve
+completed_at: "2026-10-25T22:36:00+0000"
+finished_to: "done"
 ---
 ## 目的
 
