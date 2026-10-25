@@ -89,7 +89,7 @@ deny:
   # --- 検証用ルール（t-）
   - id: t-no-pip
     match: Bash
-    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(?:pip3?|-m\s+pip)(\.exe)?\s+install\b'
+    regex: '(^|\x00)(?:[^\s\x00\\/]*+[\\/])*+(?:pip3?(\.exe)?|python[0-9.]*(\.exe)?\s+-m\s+pip)\s+install\b'
     message: >-
       pip install は使いません。依存は requirements.txt に書いて、導入はユーザに依頼してください。
   - id: t-no-index-edit
