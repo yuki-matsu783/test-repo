@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 2 設計 — --verbose の説明</title>
+<style>
+  body { font-family: system-ui, sans-serif; line-height: 1.7; margin: 0; padding: 16px; max-width: 760px; margin-inline: auto; color: #1d1d1f; background: #fff; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 1.6em; }
+  pre { background: #f4f4f5; padding: 10px; border-radius: 6px; overflow-x: auto; font-size: 0.9rem; }
+  code { font-family: ui-monospace, monospace; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { border: 1px solid #d4d4d8; padding: 6px 8px; text-align: left; vertical-align: top; }
+  @media (prefers-color-scheme: dark) {
+    body { color: #f4f4f5; background: #18181b; }
+    pre { background: #27272a; }
+    th, td { border-color: #3f3f46; }
+  }
+</style>
+</head>
+<body>
+<h1>main.sh に <code>--verbose</code> を足す設計、ひとことで</h1>
+
+<h2>何を決めたか</h2>
+<p><code>--verbose</code> を付けると、main.sh は「何を読んで、何で絞って、どこに書いたか」を標準エラーに 4 行で教えてくれるようにします。付けなければ今と同じ動きです。</p>
+
+<h2>引数はどう受けるか</h2>
+<ul>
+  <li><code>--verbose</code> は<strong>いちばん前の引数だけ</strong>オプションとして受けます。</li>
+  <li>それ以外の場所に出てきた <code>--verbose</code> は、今どおりファイル名やパターンとして扱います。</li>
+  <li><code>-v</code> や <code>--verbose=1</code> は認めません（今は決めないことにしました）。</li>
+</ul>
+
+<h2>出る言葉の例</h2>
+<pre>$ sh main.sh --verbose access.log ERROR errors
+経過: 入力ファイル: access.log
+経過: 絞り込みパターン: ERROR
+経過: 出力先: errors.txt
+経過: 一致した行数: 2</pre>
+<p>標準出力には何も出ません。<code>errors.txt</code> の中身は、<code>--verbose</code> を付けない場合と同じです。</p>
+
+<h2>今の動きは変わるのか</h2>
+<table>
+  <thead><tr><th>場面</th><th>変わるか</th></tr></thead>
+  <tbody>
+    <tr><td><code>--verbose</code> を付けない呼び出し</td><td>変わらない（経過は出ず、出力ファイルと終了コードも同じ）</td></tr>
+    <tr><td>引数が足りないときの使い方の文面</td><td>変わらない（<code>--verbose</code> は載せない）</td></tr>
+    <tr><td>先頭に <code>--verbose</code> という名前のファイルがあるとき</td><td>変わる。これは避け方（<code>./--verbose</code> と書く）を設計に書いた、ただ 1 つの例外</td></tr>
+  </tbody>
+</table>
+
+<h2>まだ決めていないこと</h2>
+<ul>
+  <li>時刻や所要時間など、経過の項目を増やすこと</li>
+  <li>色や言語の切り替え</li>
+  <li>使い方の文面に <code>--verbose</code> を載せるかどうか（今は載せない）</li>
+</ul>
+
+<h2>次に起きること</h2>
+<p>この設計をもとに、受入テストを先に書き、そのあと実装します。例の出力は、受入テストの段で実際に動かして確かめます。</p>
+</body>
+</html>
