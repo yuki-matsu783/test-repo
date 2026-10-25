@@ -11,6 +11,8 @@ human_review:
 allow:
   - match: Write|Edit
     glob: ".claude/skills/process-implement/*"
+started_at: "2026-10-25T22:26:03+0000"
+base_sha: "fd00a82458737db42b811a1bc5ac48906d18b091"
 ---
 振り返りで拾った候補 1（`wip/handoff/skill-candidates.md` の「候補 1」）を反映する。
 
