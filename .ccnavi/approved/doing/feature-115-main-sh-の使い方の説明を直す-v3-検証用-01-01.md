@@ -7,6 +7,8 @@ title: "main.sh のヘッダの説明を実際の動きに合わせる"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T09:43:41+0000"
+base_sha: "f6572b018f57d2148e0ece11dd7310a8a52679bc"
 ---
 ## 目的
 
