@@ -1,4 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: inc, points: 45, lines_over: 0, include: ["main.sh"], message: main.sh の行数}
+  - {id: inc, points: 45, lines_over: 0, include: ["README.md"], message: README の行数}
