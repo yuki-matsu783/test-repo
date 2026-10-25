@@ -7,6 +7,8 @@ title: "main.sh の振る舞いを調べて要約にまとめる"
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T10:50:55+0000"
+base_sha: "29748863242a6b2e711ebcac71e3b69e441bd7d2"
 ---
 ## 目的
 
