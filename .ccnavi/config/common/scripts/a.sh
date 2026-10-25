@@ -1,2 +1,2 @@
 #!/bin/sh
-exit 3
+echo 15
