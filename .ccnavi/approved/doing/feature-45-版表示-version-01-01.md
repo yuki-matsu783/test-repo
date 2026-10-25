@@ -7,6 +7,8 @@ title: "版表示 --version（実装）"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T00:52:59+0000"
+base_sha: "b039c4e747408cd4cd5f664487d56dd60a077006"
 ---
 ## 目的
 
