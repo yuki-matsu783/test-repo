@@ -7,6 +7,8 @@ title: "main.sh の先頭コメントに、上書き・一致なし・空パタ�
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T09:48:23+0000"
+base_sha: "09e3dfdf6b767f4358f499844de188c879205ab2"
 ---
 ## 目的
 
