@@ -1,4 +1,4 @@
 version: 1
-levels: {medium: 70, high: 40, critical: 20}
+levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: any-change, points: 45, lines_over: 1, message: 変更あり}
+  - {id: inc, points: 45, lines_over: 1, include: ["main.sh"], message: main.sh の行数}
