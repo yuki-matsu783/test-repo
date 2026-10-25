@@ -1,7 +1,7 @@
 ---
 ticket: feature-181-arg-research2-01-01
 parent: feature-181-arg-research2
-learnings: recorded
+learnings: 3
 ---
 
 - git は生で打つと guard で止まる（`builtin:guard-raw-git`）。子のワークツリーでも `sh .ccnavi/scripts/ccnavi-git.sh <サブコマンド>` の形で打つ。`cd <ワークツリー> && git ...` の複合も同じく止まる。
