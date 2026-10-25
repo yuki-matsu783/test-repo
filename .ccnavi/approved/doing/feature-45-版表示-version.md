@@ -3,7 +3,7 @@ version: 1
 ticket: feature-45-版表示-version
 issue: 45
 mr: 46
-title: "版表示 --version"
+title: 版表示 --version
 phases:
   quick-work:
     kind: work
@@ -12,15 +12,18 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  main.sh に --version を足し、版 0.1.0 を表示できるようにする。設計判断も
+- quick-work
+rationale: 'main.sh に --version を足し、版 0.1.0 を表示できるようにする。設計判断も
+
   並行作業も要らない 1 ファイルの小さい変更なので、計画は quick-work の 1 ステップにする。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "main.sh"
-started_at: "2026-10-25T00:52:47+0000"
-base_sha: "2fb1c2fde289b4821cc21431081135c12f713659"
+- match: Write|Edit
+  glob: main.sh
+started_at: 2026-10-25T00:52:47+0000
+base_sha: 2fb1c2fde289b4821cc21431081135c12f713659
+feedback: []
 ---
 ## 目的
 
