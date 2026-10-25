@@ -21,6 +21,7 @@ set -eu
 main() {
   if [ "$#" -lt 3 ]; then
     echo "使い方: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>" >&2
+    echo "出力: <出力の接頭辞>.txt に、絞り込んだ行を番号付きで書く" >&2
     echo "引数が足りないと終了コード 1 で終わる。例: sh main.sh access.log ERROR errors" >&2
     exit 1
   fi
