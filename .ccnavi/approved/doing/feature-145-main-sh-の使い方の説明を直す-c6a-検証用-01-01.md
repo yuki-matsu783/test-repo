@@ -7,6 +7,8 @@ title: "main.sh の先頭コメントに、絞り込みの区別と出力の上�
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:55:41+0000"
+base_sha: "93f24edafee3ab9eb0bfa29d37aad3c686d3bfaf"
 ---
 ## 目的
 
