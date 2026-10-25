@@ -7,6 +7,8 @@ title: "main.sh の冒頭の使い方の説明を実際の動作に合わせる"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:19:23+0000"
+base_sha: "6ec61728fa256e5576431cf7ce520591f8b7e8b7"
 ---
 ## 目的
 
