@@ -1,0 +1,37 @@
+id: wf-design
+name: 設計の手順
+version: 1.0.0
+nodes:
+- id: s
+  type: start
+  name: 開始
+  position:
+    x: 0
+    y: 0
+  data: {}
+- id: p
+  type: prompt
+  name: 設計の手順
+  position:
+    x: 1
+    y: 0
+  data:
+    prompt: 設計メモを wip/design/summarize.md に書く（入力のログ形式・引数・出力の形・終了コード・例）。TPLMARK-DESIGN
+- id: e
+  type: end
+  name: 終了
+  position:
+    x: 2
+    y: 0
+  data: {}
+connections:
+- id: c1
+  from: s
+  to: p
+  fromPort: output
+  toPort: input
+- id: c2
+  from: p
+  to: e
+  fromPort: output
+  toPort: input
