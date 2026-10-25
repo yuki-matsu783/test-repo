@@ -1,7 +1,7 @@
 ---
 ticket: feature-183-arg-research3-01-01
 parent: feature-183-arg-research3
-learnings: 4
+learnings: recorded
 ---
 
 - 生の git は使えない。`ccnavi-git.sh` を通す（`builtin:guard-raw-git` で止まった）。
