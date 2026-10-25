@@ -3,7 +3,7 @@ version: 1
 ticket: feature-191-version-flag2
 issue: 191
 mr: 192
-title: "main.sh に --version オプションを足す (G2)"
+title: main.sh に --version オプションを足す (G2)
 phases:
   quick-work:
     kind: work
@@ -11,23 +11,36 @@ phases:
     review: mr
     scope: inherit
     when: 設計判断や並行作業が要らないとき
+  skill-improve:
+    kind: feedback
+    title: スキル改善
+    review: mr
+    scope:
+    - .claude/skills/*
+    - docs/wiki/*
+    when: 振り返りでスキルの候補が出たとき。候補が無ければ置かない
 plan:
-  - quick-work
-rationale: |
-  main.sh に版番号を返す --version オプションが無く、利用者が今どの版の main.sh を使っているか確かめられない。
+- quick-work
+rationale: 'main.sh に版番号を返す --version オプションが無く、利用者が今どの版の main.sh を使っているか確かめられない。
+
   issue #191 の G2 として、--version を足して版番号を表示し、終了コード 0 で終わるようにする。
+
   設計判断は要らず、触るのは main.sh と検証用のテストだけなので quick-work の 1 ステップで回す。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "main.sh"
-  - match: Write|Edit
-    glob: "tests/*"
-  - match: Write|Edit
-    glob: "docs/wiki/*"
-  - match: Write|Edit
-    glob: ".claude/skills/*"
-started_at: "2026-10-25T22:13:34+0000"
-base_sha: "fd45556075c68f250ace68989f1f0e5844c2cadd"
+- match: Write|Edit
+  glob: main.sh
+- match: Write|Edit
+  glob: tests/*
+- match: Write|Edit
+  glob: docs/wiki/*
+- match: Write|Edit
+  glob: .claude/skills/*
+started_at: 2026-10-25T22:13:34+0000
+base_sha: fd45556075c68f250ace68989f1f0e5844c2cadd
+feedback:
+- skill-improve
 ---
 ## 目的
 
