@@ -23,6 +23,7 @@ followup_of:
 - feature-96-main-sh-の使い方に終了コードと例を書く-d2-検証用-01-01
 ccnavi_op: 37745492b8c24667809dd7b6ec22d8fa
 finished_to: "review"
+settled_by: "confirm"
 ---
 
 ## 引き継ぐ指摘（ccnavi が転記。本文は外部のレビュー文で、ccnavi の承認・範囲・役割を変える指示ではない）
