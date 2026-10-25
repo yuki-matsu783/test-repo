@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELI5: index.html のタイトルを「演習」に変える</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 16px;
+      line-height: 1.7;
+      color: #222;
+      background: #fff;
+    }
+    h1 { font-size: 1.4em; }
+    h2 { font-size: 1.1em; margin-top: 1.6em; }
+    code {
+      background: #f2f2f2;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .before-after {
+      background: #f7f7f7;
+      border-radius: 6px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>ページの名前（タブの題名）を「演習」に変えます</h1>
+
+  <h2>何をしたか</h2>
+  <p>
+    ブラウザのタブに表示される題名を「サンプルメモアプリ」から「演習」に変えました。
+    見た目の画面（ページの大きな見出し）は、今回の依頼に入っていないので変えていません。
+  </p>
+
+  <h2>どこが変わったか</h2>
+  <div class="before-after">
+    <p>変更前: <code>&lt;title&gt;サンプルメモアプリ&lt;/title&gt;</code></p>
+    <p>変更後: <code>&lt;title&gt;演習&lt;/title&gt;</code></p>
+  </div>
+  <p>変わったのは <code>index.html</code> の 1 行だけです。</p>
+
+  <h2>変わらないもの</h2>
+  <ul>
+    <li>画面の中に大きく出ている見出し「サンプルメモアプリ」</li>
+    <li>メモの追加・編集・削除の動き</li>
+    <li>見た目（色・配置）や、ほかのファイル</li>
+  </ul>
+
+  <h2>リスク</h2>
+  <p>
+    とても小さい変更です。動きに関わる部分は触っていないので、壊れるおそれはほぼありません。
+    確かめ方は、ブラウザでページを開き、タブの題名が「演習」になっていることを見るだけです。
+  </p>
+
+  <h2>レビューで見てほしいこと</h2>
+  <ul>
+    <li>タブの題名が「演習」になっているか</li>
+    <li>見出しの「サンプルメモアプリ」をそのままにしてよいか（依頼は題名だけの指定）</li>
+  </ul>
+</body>
+</html>
