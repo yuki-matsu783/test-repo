@@ -12,6 +12,7 @@ base_sha: "557ad4ebd88235b8134b887edac5a5bf7a6d09e5"
 completed_at: "2026-10-25T18:48:47+0000"
 merged_sha: "c72a555814a1e06e5cfd4205bac7b6fc76c5bcb7"
 finished_to: "review"
+settled_by: "confirm"
 ---
 main.sh を実際に動かし、引数・入力ファイル・終了コードの振る舞いを確かめて、
 wip/research/summary.md にまとめる。
