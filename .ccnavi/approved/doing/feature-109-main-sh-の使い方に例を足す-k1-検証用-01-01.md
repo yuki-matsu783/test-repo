@@ -7,6 +7,8 @@ title: "main.sh の冒頭コメントに使い方の例を足す（quick-work）
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T08:46:53+0000"
+base_sha: "08df6670e765954ce4d7edc3d7e7f57432f710a0"
 ---
 ## 目的
 
