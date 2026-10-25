@@ -5,6 +5,7 @@ set -eu
 main() {
   if [ "$#" -lt 3 ]; then
     echo "使い方: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>" >&2
+    echo "例: sh main.sh input.txt ERROR error-log" >&2
     exit 1
   fi
 
