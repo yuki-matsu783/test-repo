@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>版の番号を表示する変更（フェーズ 1）</title>
+<style>
+  body { font-family: sans-serif; line-height: 1.7; max-width: 640px; margin: 0 auto; padding: 16px; color: #222; background: #fff; }
+  h1 { font-size: 1.4em; }
+  code { background: #f2f2f2; padding: 2px 4px; border-radius: 4px; }
+  pre { background: #f2f2f2; padding: 8px; border-radius: 6px; overflow-x: auto; }
+</style>
+</head>
+<body>
+<h1>版の番号を表示する変更</h1>
+
+<h2>何を変えたか</h2>
+<p>コマンドに <code>--version</code> を付けて実行すると、今の版の番号「0.1.0」を表示して終わるようにしました。</p>
+<pre>sh main.sh --version
+0.1.0</pre>
+
+<h2>なぜ変えたか</h2>
+<p>今どの版のプログラムを使っているかを、すぐに確かめられるようにするためです（issue #53）。</p>
+
+<h2>どこが変わったか</h2>
+<ul>
+  <li><code>main.sh</code>: 版の番号を一箇所に書き、最初の引数が <code>--version</code> のときだけ番号を出して終わる処理を足しました。他の動きは変えていません。</li>
+  <li><code>README.md</code>: 使い方に <code>--version</code> の書き方を一行足しました。</li>
+</ul>
+
+<h2>リスク</h2>
+<p>低いと考えています。既存の使い方（ファイルを絞り込んで書き出す動き）は、確かめた範囲では前と同じように動きました。</p>
+<ul>
+  <li>引数が足りないときは、これまでどおり使い方を出して終わります。</li>
+  <li>入力ファイルが無いときは、これまでどおりエラーで終わります。</li>
+</ul>
+
+<h2>まだ無いもの</h2>
+<p>自動で確かめるテストは、この変更の範囲に入っていないので、まだ作っていません。</p>
+</body>
+</html>
