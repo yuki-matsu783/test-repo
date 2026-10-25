@@ -1,0 +1,2 @@
+1. ERROR disk full
+2. ERROR (x+y)
