@@ -7,6 +7,8 @@ title: main.sh の引数と終了コードの調査
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T18:02:26+0000"
+base_sha: "43d1488b8ec41297d864530c59c2e6ab8685bed3"
 ---
 main.sh の引数の受け方と終了コードを読み、実際に実行して挙動を記録する。結果は wip/research/summary.md にまとめる。
 
