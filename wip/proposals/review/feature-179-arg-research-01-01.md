@@ -9,6 +9,9 @@ allow:
     glob: "wip/research/*"
 started_at: "2026-10-25T18:02:26+0000"
 base_sha: "43d1488b8ec41297d864530c59c2e6ab8685bed3"
+completed_at: "2026-10-25T18:03:35+0000"
+merged_sha: "64c8e011eb9bd78b4bbd4baee410c604f29c49dd"
+finished_to: "review"
 ---
 main.sh の引数の受け方と終了コードを読み、実際に実行して挙動を記録する。結果は wip/research/summary.md にまとめる。
 
