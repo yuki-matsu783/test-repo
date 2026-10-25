@@ -14,6 +14,9 @@ allow:
     glob: "wip/research/*"
 started_at: "2026-10-25T09:53:45+0000"
 base_sha: "70bd561a1c9d40ad49f819f21c62765ac83ec89e"
+completed_at: "2026-10-25T09:55:52+0000"
+merged_sha: "b30a618e5284a53c775637cba3a37a893df1d5ed"
+finished_to: "review"
 ---
 `main.sh` の挙動を調べ、結果を `wip/research/summary.md` にまとめる。
 

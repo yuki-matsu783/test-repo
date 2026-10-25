@@ -1,0 +1,7 @@
+  ERROR one
+	ERROR two
+\u3000ERROR full
+ok line
+C:\path ERROR back
+star * line
+
