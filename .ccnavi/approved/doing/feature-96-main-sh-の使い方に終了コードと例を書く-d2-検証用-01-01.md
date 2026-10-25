@@ -7,6 +7,8 @@ title: "main.sh に使い方・終了コード・例を書く"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T07:39:24+0000"
+base_sha: "58a9efc127ccaff9f578b5702d44aff1c05159a1"
 ---
 ## 目的
 
