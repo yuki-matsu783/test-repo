@@ -12,6 +12,9 @@ allow:
     glob: "wip/research/*"
 started_at: "2026-10-25T18:23:53+0000"
 base_sha: "67ef107cd4c390d2d9493199aab479cc33bb3ce5"
+completed_at: "2026-10-25T18:25:10+0000"
+merged_sha: "9e788a95610dc60dc8e3f1a77fc6d964868e36b7"
+finished_to: "done"
 ---
 `main.sh`（ワークスペースのルート）の引数の扱いと終了コードを、実行して確かめる。
 
