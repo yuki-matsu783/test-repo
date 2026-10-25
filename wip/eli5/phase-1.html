@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 1: main.sh の使い方を調べた</title>
+<style>
+  :root { --fg: #1d1d1f; --muted: #6b6b70; --bg: #ffffff; --card: #f4f4f6; --accent: #2b6cb0; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fg: #f2f2f4; --muted: #a0a0a8; --bg: #161618; --card: #232326; --accent: #7fb2ea; }
+  }
+  :root[data-theme="dark"] { --fg: #f2f2f4; --muted: #a0a0a8; --bg: #161618; --card: #232326; --accent: #7fb2ea; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.7; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 8px; }
+  h2 { font-size: 1.15rem; margin: 28px 0 8px; color: var(--accent); }
+  p { margin: 8px 0; }
+  .muted { color: var(--muted); font-size: 0.95rem; }
+  .card { background: var(--card); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+  ul { padding-left: 1.2em; margin: 6px 0; }
+  li { margin: 4px 0; }
+  code { font-family: ui-monospace, monospace; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>フェーズ 1: main.sh の使い方を調べた</h1>
+  <p class="muted">この変更はコードを一切変えていません。「main.sh は説明どおりに動いているか」を実際に動かして確かめ、結果を書き留めただけです。</p>
+
+  <h2>何をしたか</h2>
+  <div class="card">
+    <p><code>main.sh</code> は、ファイルの中から指定した言葉を含む行だけを取り出し、番号を付けて別のファイルに書くスクリプトです。その動きを、冒頭の説明書きと実際の実行の両方で確かめました。</p>
+  </div>
+
+  <h2>確かめたこと</h2>
+  <ul>
+    <li>引数が足りないとき、入力ファイルが無いとき、正常に動くときの 3 つの場合に、どう終わるかを見た</li>
+    <li>絞り込みの言葉が空のとき、記号を含むとき、出力名に拡張子を付けたときの動きも見た</li>
+    <li>試すためのファイルは、リポジトリの外（一時的な場所）に作った。リポジトリの中には何も残していない</li>
+  </ul>
+
+  <h2>何が変わったか</h2>
+  <div class="card">
+    <p>変わったのは、結果を書いた <code>wip/research/summary.md</code> の 1 つだけです。<code>main.sh</code> や説明のファイルは触っていません。</p>
+    <p>見つかった食い違いは、直さずに事実として書いてあります。直すかどうかは、次にユーザが決めます。</p>
+  </div>
+
+  <h2>リスク</h2>
+  <div class="card">
+    <p>低い。コードは動かさず、読んで試しただけです。ただし、ここで確かめた内容が次の作業の前提になるため、結果の書き間違いがないかは見てもらう価値があります。</p>
+  </div>
+
+  <h2>レビューで見てほしいこと</h2>
+  <ul>
+    <li><code>wip/research/summary.md</code> に書かれた終了コードと、実際の動きが合っているか</li>
+    <li>食い違いの書き方が、事実だけになっているか（直す提案が混ざっていないか）</li>
+  </ul>
+</main>
+</body>
+</html>
