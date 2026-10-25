@@ -9,6 +9,9 @@ allow:
     glob: "wip/research/*"
 started_at: "2026-10-25T10:50:55+0000"
 base_sha: "29748863242a6b2e711ebcac71e3b69e441bd7d2"
+completed_at: "2026-10-25T10:52:28+0000"
+merged_sha: "4312a478b0ce81f4ca8e8579ab94c322592ae21a"
+finished_to: "review"
 ---
 ## 目的
 
