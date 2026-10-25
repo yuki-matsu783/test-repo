@@ -22,6 +22,7 @@ main() {
   if [ "$#" -lt 3 ]; then
     echo "使い方（親側で変更）: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>" >&2
     echo "引数が足りないと終了コード 1 で終わる。例: sh main.sh access.log ERROR errors" >&2
+    echo "出力は <出力の接頭辞>.txt に書かれる" >&2
     exit 1
   fi
 
