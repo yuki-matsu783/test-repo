@@ -139,7 +139,7 @@ allow:
   - id: skill-review-every-10
     match: Stop
     glob: "*"
-    every: 1
+    every: 2
     additionalContextFile: .ccnavi/docs/skill-review.md
 
   # 提案を書くとき（親のフィードバック計画の改版を含む）に、振り返りの候補を思い出させる。
