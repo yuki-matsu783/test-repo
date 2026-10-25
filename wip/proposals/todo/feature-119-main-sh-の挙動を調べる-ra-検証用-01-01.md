@@ -9,6 +9,9 @@ rationale: |
   コードとスクリプトの実行で確かめる。結果は次の作業の判断材料になる。
 scope: ["wip/research/*"]
 deliverables: ["wip/research/summary.md"]
+allow:
+  - match: Write|Edit
+    glob: "wip/research/*"
 ---
 `main.sh` の挙動を調べ、結果を `wip/research/summary.md` にまとめる。
 

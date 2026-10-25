@@ -13,6 +13,7 @@ phases:
     review: none
     scope: ["wip/research/*"]
     deliverables: ["wip/research/summary.md"]
+    when: 既存の振る舞いや依存が分からないとき。分かっているなら省略する
 plan:
   - research
 title: main.sh の挙動を調べる（RA 検証用）
@@ -24,8 +25,27 @@ allow:
   - match: Write|Edit
     glob: "wip/research/*"
 ---
-main.sh の挙動を、読むことと実行して確かめることで調べ、結果を `wip/research/summary.md` にまとめる。
-対象は `main.sh`（ワークスペースの直下）。`main.sh` と `README.md` の記述が食い違う箇所があれば、それも書く。
-コードと README は変えない。範囲は `wip/research/*` だけ。
 
-子は `<親>-01-01`（調査フェーズの最初の子）。子の提案は同じ `wip/proposals/todo/` に置く。
+## 目的
+
+`main.sh` の挙動を、読むことと実行して確かめることで調べ、結果を `wip/research/summary.md` にまとめる。
+ccnavi の検証用で、コードは変えない。
+
+## 範囲
+
+- 対象は `main.sh`（ワークスペースの直下）。`main.sh` と `README.md` の記述が食い違う箇所があれば、それも書く
+- 書いてよいのは `wip/research/*` だけ（子の範囲も同じ）
+
+## 対象外
+
+- `main.sh` と `README.md` の変更
+- 設計や実装（次の作業として、結果を見てから別に提案する）
+
+## 完了の確かめ方
+
+子 `<親>-01-01` が `wip/research/summary.md` を書き、そこに挙がった 7 項目すべてに結果が付いていること。
+
+## 計画の理由
+
+調査フェーズだけを計画に置く。結果をユーザが読んでから、設計や実装に進むかを決める。
+子の提案は同じ `wip/proposals/todo/` に置いてある。
