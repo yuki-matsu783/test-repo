@@ -16,6 +16,7 @@ base_sha: "fd00a82458737db42b811a1bc5ac48906d18b091"
 completed_at: "2026-10-25T22:28:04+0000"
 merged_sha: "6d1586ca68c50c20ca407fa2134c4f7c338a920e"
 finished_to: "review"
+settled_by: "confirm"
 ---
 振り返りで拾った候補 1（`wip/handoff/skill-candidates.md` の「候補 1」）を反映する。
 
