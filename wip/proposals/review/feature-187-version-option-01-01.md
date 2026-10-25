@@ -16,6 +16,9 @@ allow:
     glob: "docs/wiki/*"
 started_at: "2026-10-25T21:58:47+0000"
 base_sha: "75d83d986b2272417f90fbf98fb0dc171461bfcd"
+completed_at: "2026-10-25T22:00:21+0000"
+merged_sha: "e06fdda27bd472d0af94be2777bb47a0bac01c18"
+finished_to: "review"
 ---
 親の範囲の中で次をする。
 
