@@ -9,6 +9,8 @@ allow:
     glob: "main.sh"
   - match: Write|Edit
     glob: "README.md"
+started_at: "2026-10-25T04:53:37+0000"
+base_sha: "87b72f07bdd6c922805a945bd2a49b30e494f414"
 ---
 ## 目的
 
