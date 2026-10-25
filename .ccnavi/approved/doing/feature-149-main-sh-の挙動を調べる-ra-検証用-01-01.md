@@ -10,6 +10,8 @@ title: "main.sh の振る舞いを調べて summary.md にまとめる"
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T11:05:23+0000"
+base_sha: "52a40a6c9a091dca891b55616676b31ac43220da"
 ---
 ## 目的
 
