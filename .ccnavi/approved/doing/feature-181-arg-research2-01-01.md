@@ -10,6 +10,8 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T18:23:53+0000"
+base_sha: "67ef107cd4c390d2d9493199aab479cc33bb3ce5"
 ---
 `main.sh`（ワークスペースのルート）の引数の扱いと終了コードを、実行して確かめる。
 
