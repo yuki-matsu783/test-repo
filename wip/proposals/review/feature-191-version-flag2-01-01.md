@@ -14,6 +14,9 @@ allow:
     glob: "tests/*"
 started_at: "2026-10-25T22:13:48+0000"
 base_sha: "f342ad8bf29e4f6e5e4b422cbaf9c07239b753f1"
+completed_at: "2026-10-25T22:15:07+0000"
+merged_sha: "d9a91cdd29f5aff839a8b6be87160832bf0acbf8"
+finished_to: "review"
 ---
 main.sh の先頭付近に版番号の定数（`VERSION="0.1.0"`）を置き、引数の先頭が `--version` のとき `main.sh <版番号>` ではなく版番号だけを 1 行表示して終了コード 0 で終わる処理を足す。`main` 関数の中で、引数の数を見る前に判定する。
 
