@@ -7,6 +7,8 @@ title: "main.sh の仕様照合と、ずれの修正（子 1）"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T00:58:18+0000"
+base_sha: "37b34f672e5a66103de2a69275607ef77d0b0f37"
 ---
 ## 目的
 
