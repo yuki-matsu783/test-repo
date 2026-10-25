@@ -1,4 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: main-sh, points: 45, glob: "main.sh", message: main.sh に触った}
+  - {id: script-main, points: 0, script: .ccnavi/config/common/scripts/risk-main.sh, message: main.sh を触るスクリプトの点}
