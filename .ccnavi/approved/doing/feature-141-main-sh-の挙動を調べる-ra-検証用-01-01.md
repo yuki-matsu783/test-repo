@@ -7,6 +7,8 @@ title: "main.sh の挙動を読み、実行して確かめ、summary.md にま�
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T10:45:33+0000"
+base_sha: "e2fc3a54a2a94595fcd169acee5dd66ea8738709"
 ---
 ## 目的
 
