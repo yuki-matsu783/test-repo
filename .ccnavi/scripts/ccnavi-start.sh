@@ -104,7 +104,8 @@ sh .ccnavi/scripts/ccnavi-start.sh --list-open
   --mr          フォークから出た MR は元ブランチがこのリポジトリにないので、理由を出して止める。--issue と一緒に渡せる
                 （順番は問わない）。<値> は <番号> か <owner/repo>#<番号>
   --slug <語>   ブランチ名の slug（小文字・数字・ハイフン）。省くと issue の題から作る（Chrome 拡張の「始める」と同じ
-                作り方。ccnavi の実行ファイルに聞く）
+                作り方。ccnavi の実行ファイルに聞く）。題が長くて slug が途中で切れるときは、何も作らずに止めて、
+                短い --slug を付けて打ち直すよう案内する（短い語は、題の要点からエージェントが考える）
   --prefix <語> 先頭の語（既定 feature）
   --title <題>  MR の題。省くと issue の題、読めなければ「#<番号> <slug>」
   --repo <owner/repo>
@@ -348,7 +349,7 @@ scripts="$root/.ccnavi/scripts"
 host_err="$state/start-host-err-$$"
 cand_json="$state/start-candidates-$$.json"
 heads_file="$state/start-heads-$$"
-trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.items" "$host_err.issues" "$host_err.mrs"' EXIT
+trap 'rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" "$cand_json" "$heads_file" "$heads_file.raw" "$heads_file.err" "$host_err.items" "$host_err.issues" "$host_err.mrs"' EXIT
 log_info 始めた -- "kind=${what:-${check:+check}${list_open:+list-open}${new_issue_title:+new-issue}}" "number=$number" "dry=${dry:-no}"
 
 # origin のパス（owner/repo）。issue の値の正規化に使う。読めなければ空（host_open が理由を言う）
@@ -506,11 +507,6 @@ host_api_failed() {
 	ccnavi_host_fail_status "$3" >"$host_err.status"
 	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
 	ccnavi_host_fail_body "$3" >"$host_err.body"
-	# GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する。この結果で mr_linked_issues が REST に替えるかを決める
-	rm -f "$host_err.blocked" || :
-	if ccnavi_host_graphql_blocked "$3"; then
-		: >"$host_err.blocked"
-	fi
 }
 # mr_linked_issues は $( ) の中で呼ばれるので、理由はファイル（$host_err.why）で受け渡す
 ml_why=""
@@ -572,14 +568,18 @@ issue_title_get() {
 }
 
 # issue の番号と題から、新しい親のブランチ名（= 識別子）を実行ファイルに作らせる（`worktree issue-id`）。
-# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、同じ issue なら同じ名前になる。
+# Chrome 拡張の「始める」と同じ関数（`ticket_ids.issue_identifier`）なので、題が短ければ同じ名前になる。
+# 題が長くて slug が途中で切れるときは、実行ファイルが `long yes` を返す（issue_branch_long）。拡張は切った名前で
+# 進めるが、ここでは短い --slug を付けさせて止める（エージェントが題から短い語を考える）。
 # プロジェクト（projects/<名前>）のリポジトリなら、その名前を渡す（slug の頭に付く）。
 # 名前を issue_branch に入れる。実行ファイルが無い・答えないなら 1、作れないと言われたら 2（理由は issue_branch_why）
 issue_branch=""
 issue_branch_why=""
+issue_branch_long=""
 issue_branch_make() {
 	issue_branch=""
 	issue_branch_why=""
+	issue_branch_long=""
 	ib_project=$(ccnavi_project "$top" "$root")
 	if ib_bin=$(ccnavi_bin "$root"); then
 		ib_rc=0
@@ -593,6 +593,7 @@ issue_branch_make() {
 	issue_branch_why=$(tr -d '\r' <"$state/start-issue-id-$$" 2>/dev/null | head -n 1 | sed 's/^ccnavi: //')
 	rm -f "$state/start-issue-id-$$"
 	issue_branch=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^id //p' | head -n 1)
+	issue_branch_long=$(printf '%s\n' "$ib_out" | tr -d '\r' | sed -n 's/^long //p' | head -n 1)
 	[ -n "$issue_branch" ] && return 0
 	[ "$ib_rc" -ne 0 ] && return 2
 	return 1
@@ -719,24 +720,12 @@ new_issue_post() {
 	fi
 }
 
-# GraphQL を使えない環境で、MR の本文の閉じるキーワード（close・fix・resolve の各形。大文字小文字不問）に続く
-# `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ出す。<MR の番号>
-# GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
-# コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。
-# 戻り値: 0 読めた / 1 API の失敗
-mr_linked_issues_body() {
-	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
-	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
-		'(.body // "") | gsub("(?s)```.*?```"; "") | gsub("(?s)<!--.*?-->"; "") | gsub("`[^`\n]*`"; "") | gsub("(?m)^[ \t]*>[^\n]*"; "")
-		| scan("(?i)(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])") | .[0] | if startswith("#") then $p + . else . end' || return 1
-}
-
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
 # 戻り値: 0 読めた / 1 API の失敗（応答の errors・null を含む） / 2 読み切れない（件数の上限を超えた）。理由は ml_why
 mr_linked_issues() {
 	ml_mr="$1"
 	ml_why=""
-	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.blocked" "$host_err.why" || :
+	rm -f "$host_err" "$host_err.status" "$host_err.body" "$host_err.why" || :
 	if [ "$ccnavi_h_kind" = github ]; then
 		ml_owner="${ccnavi_h_path%%/*}"
 		ml_name="${ccnavi_h_path#*/}"
@@ -746,16 +735,7 @@ mr_linked_issues() {
 			ml_page=$((ml_page + 1))
 			ml_payload=$("$ccnavi_h_jq" -n --arg o "$ml_owner" --arg n "$ml_name" --argjson num "$ml_mr" --argjson c "$ml_cursor" \
 				'{query: "query($o:String!,$n:String!,$num:Int!,$c:String){repository(owner:$o,name:$n){pullRequest(number:$num){closingIssuesReferences(first:100,after:$c){nodes{number repository{nameWithOwner}} pageInfo{hasNextPage endCursor}}}}}", variables: {o: $o, n: $n, num: $num, c: $c}}')
-			ml_rc=0
-			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || ml_rc=$?
-			if [ "$ml_rc" -ne 0 ]; then
-				# GraphQL を使えない環境の 403 のときだけ、MR の本文の `Closes #n` を読む形に替える（通常の環境は変わらない）
-				if [ "$ml_page" -eq 1 ] && [ -e "$host_err.blocked" ]; then
-					mr_linked_issues_body "$ml_mr"
-					return
-				fi
-				return 1
-			fi
+			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || return 1
 			if ! printf '%s' "$ml_got" | "$ccnavi_h_jq" -e '(.errors // null) == null and (.data.repository.pullRequest.closingIssuesReferences.nodes | type) == "array"' >/dev/null 2>&1; then
 				printf '%s' "紐づく issue を読めなかった（GraphQL の応答に errors があるか、MR が見つからない）" >"$host_err.why"
 				return 1
@@ -1595,6 +1575,17 @@ if [ "$total" -eq 0 ]; then
 		2) fail no-slug "issue #${number} からブランチ名を作れませんでした（${issue_branch_why}）。--slug <語> を付けて再実行してください。" 2 ;;
 		*) fail id-unchecked "issue #${number} からブランチ名を作れませんでした（ccnavi の実行ファイルが答えない）。何も作成せずに処理を中断しました。build.py でビルドするか、scripts/ccnavi-setup.sh で実行ファイルを配置してから再実行するか、--slug <語> を付けて再実行してください。" ;;
 		esac
+		if [ "$issue_branch_long" = yes ]; then
+			# 題が長く、機械で切ると語の途中や意味の欠けた名前になる。何も作らずに、短い語を付けて打ち直させる
+			printf 'ccnavi-start: issue #%s の題が長く、題から作る名前 %s は途中で切れます。ブランチは作らずに止めました（--new-issue から来たときの issue は作成済み）。\n' "$number" "$issue_branch" >&2
+			printf '案内: 名前はワークツリーのパス・子の識別子・ログのパスに何度も出るので、短く保つ。--slug は小文字・数字・ハイフンだけ（日本語は使えない）\n' >&2
+			if [ -n "$ib_project" ]; then
+				printf '案内: プロジェクト %s の issue なので、--slug の語は %s- から始める（issue の番号はリポジトリごとなので、名前を分ける）。長さは 48 文字に収める\n' "$ib_project" "$ib_project" >&2
+			fi
+			printf '次: 題の要点を表す短い英語の語を決め（30 文字ほどまで。例: text-formatter-cli）、<語> に入れて打ち直す: sh %s/ccnavi-start.sh %s --slug <語>\n' "$scripts" "$real_args" >&2
+			log_info 止めた -- "exit=2" "reason=long-title"
+			exit 2
+		fi
 		new_branch="$issue_branch"
 		slug="${new_branch#"${opt_prefix}-${number}-"}"
 	fi

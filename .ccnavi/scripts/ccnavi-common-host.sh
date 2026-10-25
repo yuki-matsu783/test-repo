@@ -33,7 +33,6 @@
 #   ccnavi_host_project_id      GitLab のプロジェクトの数の id。読めなければ 1
 #   ccnavi_run_timed <秒> <stdin> <stdout> <stderr> <コマンド>...  時間を区切って実行する（timeout コマンドに頼らない）
 #   ccnavi_host_fail_status <ホストの返事の文>  curl・gh・glab の失敗の文から HTTP の番号を取り出す
-#   ccnavi_host_graphql_blocked <ホストの返事の文>  GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する（0 なら該当）
 #   ccnavi_host_probe           プロジェクトを 1 回読む。結果は ccnavi_h_probe と ccnavi_h_project_json
 #   ccnavi_host_access          書き込みの権限を判定する（0 足りる / 1 足りない / 2 判定できない）
 #   ccnavi_preflight <top>      チケット作業の事前確認（下の説明）
@@ -315,21 +314,6 @@ ccnavi_host_fail_status() {
 	printf '%s' "$ccnavi_hs_val"
 }
 
-# GraphQL を使えない実行環境（Claude Code のクラウド）で出る 403 かを判定する。失敗の返事（本文と標準エラー）を渡し、そうなら 0 を返す。
-# gh は本文を返すので、「GitHub GraphQL is not available」の文言で見分ける（別の理由の 403・401 は 1）。
-# curl は -f が本文を捨て、403 の番号だけが残る。番号だけの 403 は、認証の失敗と見分けが付かないので 0 とする。
-# 呼び手は REST の道（/ccr/）を試し、それも失敗したら元の GraphQL の失敗を言う（通常の GitHub では /ccr/ は 404 になるだけ）。
-ccnavi_host_graphql_blocked() {
-	case "$1" in
-	*"GraphQL is not available"*) return 0 ;;
-	esac
-	[ "$(ccnavi_host_fail_status "$1")" = 403 ] || return 1
-	case "$1" in
-	*"returned error: 403"*) return 0 ;;
-	esac
-	return 1
-}
-
 # 失敗の返事の本文を、画面に出せる形（1 行・制御文字なし・先頭 200 文字・トークンは伏せる）にして出す。
 # 文字数は jq で数える（cut -c は環境によってバイトで切り、日本語の途中で壊れる）。
 ccnavi_host_fail_body() {
@@ -461,7 +445,7 @@ ccnavi_git_auth() {
 # ---- 事前確認（チケット作業の入口と、子チケットの作業から始める操作が使う）
 #
 # ホストの API と git のリモートが使える状態かを確かめる。ここの関数はユーザ向けの文面を出さず、
-# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（docs/claude/script-output.md）。
+# 結果・理由・勧める対処を変数で返す。文面と `次:` の行は呼ぶ側が組み立てる（docs/42_claude/script-output.md）。
 
 # ccnavi_host_connect の後に呼ぶ。経路によらずプロジェクトを 1 回読む（GitHub は repos/<パス>、GitLab は projects/<パス>）。
 #   ccnavi_h_project_json  応答の JSON
