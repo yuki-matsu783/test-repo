@@ -9,6 +9,8 @@ allow:
     glob: "README.md"
 rationale: |
   親 feature-51 の計画「小さい作業」（quick-work）の 1 段階。README.md の「使い方」節に 1 行足すだけ。
+started_at: "2026-10-25T03:10:34+0000"
+base_sha: "a78e47c2fc93ea423f2eb6e14333d079ddc0e29e"
 ---
 ## 目的
 
