@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+VERSION="0.1.0"
+
 # 入力を読み、条件で絞り、整形して出力する
 #
 # 使い方: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>
@@ -19,6 +21,11 @@ set -eu
 #   sh main.sh access.log ERROR errors
 #   → access.log から ERROR を含む行を取り、番号を振って errors.txt に書く
 main() {
+  if [ "${1:-}" = "--version" ]; then
+    echo "$VERSION"
+    exit 0
+  fi
+
   if [ "$#" -lt 3 ]; then
     echo "使い方: sh main.sh <入力ファイル> <絞り込みパターン> <出力の接頭辞>" >&2
     echo "引数が足りないと終了コード 1 で終わる。例: sh main.sh access.log ERROR errors" >&2
