@@ -9,6 +9,9 @@ allow:
     glob: "main.sh"
 started_at: "2026-10-25T09:38:37+0000"
 base_sha: "20d82cac706c6e0e767dfd1690d73c036f01810d"
+completed_at: "2026-10-25T09:40:11+0000"
+merged_sha: "c19cffa8c405a519aa809d08f00e0f04bb8256d2"
+finished_to: "review"
 ---
 ## 目的
 
