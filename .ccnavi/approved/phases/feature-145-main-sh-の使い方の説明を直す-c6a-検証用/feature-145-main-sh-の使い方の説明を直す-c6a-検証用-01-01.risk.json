@@ -1,0 +1,17 @@
+{
+ "points": 45,
+ "level": "HIGH",
+ "hits": [
+  {
+   "id": "inc",
+   "points": 45,
+   "detail": "main.sh の行数（1 行 > 0）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "41451b029d93de610e5b1d56b7a85c9de69b88c2",
+ "base": "93f24edafee3ab9eb0bfa29d37aad3c686d3bfaf",
+ "at": "2026-10-25T10:57:06+0000",
+ "summary": "3 ファイル、+17 -0 行、削除したファイル 0"
+}
