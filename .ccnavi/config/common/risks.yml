@@ -1,4 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: inc, points: 45, lines_over: 0, include: ["README.md"], message: README の行数}
+  - {id: fixed, points: 50, script: .ccnavi/config/common/scripts/fixed.sh, message: 固定の点}
