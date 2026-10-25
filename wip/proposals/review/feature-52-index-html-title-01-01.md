@@ -11,6 +11,9 @@ rationale: |
   親 feature-52 の計画「小さい作業」（quick-work）の 1 段階。index.html の <title> の 1 行を変えるだけ。
 started_at: "2026-10-25T04:16:17+0000"
 base_sha: "4000cfe0dd8524fa5a8864d997198252f14eb97e"
+completed_at: "2026-10-25T04:20:27+0000"
+merged_sha: "8cbfdbb12ef84f921c3819e24cb4c672f5707ce3"
+finished_to: "review"
 ---
 ## 目的
 
