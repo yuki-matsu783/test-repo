@@ -11,6 +11,9 @@ rationale: |
   親 feature-51 の計画「小さい作業」（quick-work）の 1 段階。README.md の「使い方」節に 1 行足すだけ。
 started_at: "2026-10-25T03:10:34+0000"
 base_sha: "a78e47c2fc93ea423f2eb6e14333d079ddc0e29e"
+completed_at: "2026-10-25T03:11:06+0000"
+merged_sha: "1ed1c9c4dc54a9f6764267170391d1acf70d454b"
+finished_to: "review"
 ---
 ## 目的
 
