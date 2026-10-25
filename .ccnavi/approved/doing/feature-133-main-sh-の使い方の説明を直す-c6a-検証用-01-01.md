@@ -7,6 +7,8 @@ title: "main.sh の先頭コメントに、上書き・空の結果・固定文�
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:28:58+0000"
+base_sha: "484ac1bd4cc19c5b82c04cb68244122147ea4099"
 ---
 ## 目的
 
