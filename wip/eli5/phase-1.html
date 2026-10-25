@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 1 の説明</title>
+<style>
+  :root { --fg: #222; --bg: #fff; --muted: #666; --code-bg: #f3f3f3; --warn-bg: #fff4e5; --warn-line: #e8a24a; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fg: #eee; --bg: #1b1b1b; --muted: #aaa; --code-bg: #2a2a2a; --warn-bg: #3a2d18; --warn-line: #8a6a2a; }
+  }
+  :root[data-theme="dark"] { --fg: #eee; --bg: #1b1b1b; --muted: #aaa; --code-bg: #2a2a2a; --warn-bg: #3a2d18; --warn-line: #8a6a2a; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, "Hiragino Sans", "Yu Gothic", sans-serif; line-height: 1.75; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 0.6em 0 0.2em; }
+  h2 { font-size: 1.1rem; margin-top: 1.8em; border-left: 4px solid var(--muted); padding-left: 8px; }
+  p.lead { color: var(--muted); margin-top: 0; }
+  pre { background: var(--code-bg); padding: 10px 12px; border-radius: 6px; overflow-x: auto; }
+  code { font-family: ui-monospace, Menlo, monospace; }
+  .warn { background: var(--warn-bg); border: 1px solid var(--warn-line); padding: 8px 14px; border-radius: 6px; }
+</style>
+</head>
+<body>
+<main>
+
+<h1>フェーズ 1：main.sh に「バージョンを調べる」入口を足す</h1>
+<p class="lead">ひとことで言うと、main.sh に <code>--version</code> と書いて動かすと、今のバージョン番号が出て終わる、という機能を足しました。</p>
+
+<h2>何が変わったか</h2>
+<p>これまでは <code>--version</code> を渡すと、「引数が足りません」と言われて終わっていました。今回からは、<code>--version</code> が一番最初の引数のときだけ、番号を出して終わります。</p>
+<pre>sh main.sh --version
+→ main.sh 0.1.0      （終わりの番号は 0 = 正常に終わった）</pre>
+
+<h2>変わらないこと</h2>
+<p>ふつうの使い方（入力ファイル・絞り込みの言葉・出力名の 3 つを渡す）は、今までどおりに動きます。<code>--version</code> 以外で引数が足りないときの扱いも変わりません。</p>
+
+<h2>なぜ見てほしいか</h2>
+<p>引数をどう受け取るかの部分を変えています。今までの使い方が壊れていないかを、目で見て確かめてほしい箇所です。変更は main.sh の 6 行だけです。</p>
+
+<h2>承認された内容と違うところ</h2>
+<p>子の作業は終わり、親のブランチに合流しています。ただし、承認された提案の内容と比べると、次の点が足りません。先に知らせておきます。</p>
+<div class="warn">
+<ul>
+  <li>表示が「<code>main.sh 0.1.0</code>」になっている。承認された提案では、版番号の「<code>0.1.0</code>」だけを 1 行出す予定だった。</li>
+  <li>版番号が <code>--version</code> の処理の中に直接書かれている。承認では、<code>VERSION="0.1.0"</code> の定数を main.sh の先頭付近に置く予定だった。</li>
+  <li>テストが無い（<code>tests/</code> のファイルが作られていない）。承認では、表示と終了コード 0、引数不足のときの終了コード 1、入力ファイル無しのときの終了コード 1、の 3 つを確かめるテストを 1 本足す予定だった。</li>
+  <li>実際に main.sh を動かしては確かめていない。コードを読んで確かめただけ。</li>
+</ul>
+</div>
+
+<h2>判断してほしいこと</h2>
+<p>このまま通すか、直すかを決めてください。直すときは、表示・版番号の置き方・テストを新しい子の作業として足し、そのあとで直した結果をもう一度見てもらいます（レビューの画面で「直す（fix）」を選ぶ形）。</p>
+
+</main>
+</body>
+</html>
