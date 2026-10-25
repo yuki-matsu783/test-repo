@@ -23,6 +23,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T18:47:07+0000"
+base_sha: "9cb077bbd0786895e35206a310a5e21dd1666624"
 ---
 ## 目的
 
