@@ -19,9 +19,10 @@ allow:
 - match: Write|Edit|NotebookEdit
   glob: docs/wiki/inbox/*
 started_at: "2026-10-25T19:00:14+0000"
-completed_at: ''
+completed_at: "2026-10-25T19:01:46+0000"
 base_sha: "61afc2f4e653eead7735550de6daab1b7badc2dd"
-merged_sha: ''
+merged_sha: "4eb672eca92d2696a50978cb872a1d83304b76a5"
+finished_to: "done"
 ---
 
 ## 処理するもの（ccnavi が転記。本文は記録の抜粋ではなく、場所と理由だけ）
