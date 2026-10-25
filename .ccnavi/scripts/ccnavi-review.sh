@@ -418,7 +418,7 @@ find_posted() {
 	fi
 }
 
-# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境は REST の ccr/ready_for_review）。GitLab は題の "Draft: " を除く。
+# ---- Draft を外す。GitHub は GraphQL で外す（GraphQL が 403 の環境では REST の ccr/ready_for_review を使う）。GitLab は題の "Draft: " を除く。
 
 # 題の頭の Draft の印（`Draft:`・`[Draft]`・`WIP:` など。大文字小文字は問わない）を除く。標準入力の 1 行。
 # sed の大文字小文字を区別しない指定（`I`）は GNU だけで、BSD の sed（macOS）では失敗するので、字ごとに書く。
@@ -436,7 +436,7 @@ undraft() {
 		title=$(printf '%s' "$pr" | "$JQ" -r '.title // empty')
 		stripped=$(printf '%s' "$title" | strip_draft) || stripped=""
 		if [ -n "$stripped" ] && [ "$stripped" != "$title" ]; then
-			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null
+			api PATCH "repos/$path/pulls/$mr_number" "$("$JQ" -n --arg t "$stripped" '{title: $t}')" >/dev/null || return 1
 		fi
 		query=$("$JQ" -n --arg id "$node" '{
 			query: "mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{number isDraft}}}",
@@ -448,14 +448,16 @@ undraft() {
 		3)
 			# GraphQL を使えない環境。Draft を外したあと、実状態（draft）を読んで返す（戻り値の形は GraphQL と同じ true / false）
 			rest_rc=0
-			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" >/dev/null || rest_rc=$?
+			api POST "repos/$path/pulls/$mr_number/ccr/ready_for_review" '{}' >/dev/null || rest_rc=$?
 			if [ "$rest_rc" -eq 0 ]; then
-				api GET "repos/$path/pulls/$mr_number" | "$JQ" -r '.draft // false' || rest_rc=$?
+				pr=$(api GET "repos/$path/pulls/$mr_number") || rest_rc=$?
 			fi
 			if [ "$rest_rc" -ne 0 ]; then
 				rest_fallback_failed "Draft の解除"
 				return 1
 			fi
+			rm -f "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
+			printf '%s' "$pr" | "$JQ" -r '.draft // false'
 			;;
 		*) return 1 ;;
 		esac
@@ -840,7 +842,7 @@ ready)
 	fi
 	number=$(printf '%s' "$(cat "$result")" | "$JQ" '.mr.number')
 	url=$(printf '%s' "$(cat "$result")" | "$JQ" -r '.mr.url')
-	still=$(undraft "$number")
+	still=$(undraft "$number") || still=""
 	[ "$still" = "false" ] || fail undraft-failed "Draft を解除できませんでした（${url}）。ホストの返事は上に出ている。"
 	if [ -n "$noted" ] && [ -f "$noted" ]; then
 		comment_staged ready ready "$number" "$url" "$noted" >/dev/null ||

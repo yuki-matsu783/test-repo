@@ -506,7 +506,7 @@ host_api_failed() {
 	ccnavi_host_fail_status "$3" >"$host_err.status"
 	# ホストの返事の本文（先頭200文字、1行）。原因を絞り込めるよう、文面に出す。トークンは伏せる
 	ccnavi_host_fail_body "$3" >"$host_err.body"
-	# GraphQL を使えない環境（Claude Code のクラウド）の 403 か。mr_linked_issues が REST に替えるかを決める
+	# GraphQL を使えない環境（Claude Code のクラウド）の 403 かを判定する。この結果で mr_linked_issues が REST に替えるかを決める
 	rm -f "$host_err.blocked" || :
 	if ccnavi_host_graphql_blocked "$3"; then
 		: >"$host_err.blocked"
@@ -720,13 +720,15 @@ new_issue_post() {
 }
 
 # GraphQL を使えない環境で、MR の本文の閉じるキーワード（close・fix・resolve の各形。大文字小文字不問）に続く
-# `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
+# `#n` と `<owner>/<repo>#n` を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ出す。<MR の番号>
 # GitHub の closingIssuesReferences の代わり。本文だけを読む（コミットメッセージのキーワードや、手で付けたリンクは拾わない）。
+# コードブロック・インラインコード・HTML コメント・引用行の中の文字は対象外とする。`not close #n` や、語の途中の `fix`（`bug-fix #n`）も拾わない。
 # 戻り値: 0 読めた / 1 API の失敗
 mr_linked_issues_body() {
 	mb_got=$(ccnavi_host_api GET "repos/$ccnavi_h_path/pulls/$1") || return 1
 	printf '%s' "$mb_got" | "$ccnavi_h_jq" -r --arg p "$ccnavi_h_path" \
-		'(.body // "") | scan("\\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)"; "i") | .[0] | if startswith("#") then $p + . else . end' || return 1
+		'(.body // "") | gsub("(?s)```.*?```"; "") | gsub("(?s)<!--.*?-->"; "") | gsub("`[^`\n]*`"; "") | gsub("(?m)^[ \t]*>[^\n]*"; "")
+		| scan("(?i)(?<![A-Za-z0-9_-])(?<!not )(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?):?[ \t]+((?:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+)(?![A-Za-z0-9_])") | .[0] | if startswith("#") then $p + . else . end' || return 1
 }
 
 # その MR が閉じる issue を、正規化した形 <owner/repo>#<番号> で 1 行ずつ標準出力へ。<MR の番号>
@@ -747,7 +749,7 @@ mr_linked_issues() {
 			ml_rc=0
 			ml_got=$(ccnavi_host_api POST graphql "$ml_payload") || ml_rc=$?
 			if [ "$ml_rc" -ne 0 ]; then
-				# GraphQL を使えない環境の 403 だけ、MR の本文の `Closes #n` を読む形に落とす（通常の環境は変わらない）
+				# GraphQL を使えない環境の 403 のときだけ、MR の本文の `Closes #n` を読む形に替える（通常の環境は変わらない）
 				if [ "$ml_page" -eq 1 ] && [ -e "$host_err.blocked" ]; then
 					mr_linked_issues_body "$ml_mr"
 					return

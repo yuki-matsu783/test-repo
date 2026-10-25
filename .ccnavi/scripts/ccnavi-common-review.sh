@@ -167,10 +167,10 @@ api_failed() {
 }
 
 # GraphQL を制限している実行環境がある（Claude Code のクラウドは REST だけ通し、GraphQL は 403 を返す）。
-# GitHub ではスレッドの解決状態（threads）・Draft 外し（undraft）・指摘への返信と解決が GraphQL の道を持つので、
+# GitHub ではスレッドの解決状態（threads）・Draft 外し（undraft）・指摘への返信と解決が GraphQL の道を持つ。そこで
 # GraphQL を先に試し、使えない 403 のときだけ REST（/ccr/ の道）に替える。
 #
-# gql <JSON> GraphQL を打つ。成功なら応答を標準出力へ。戻り値は、0 成功 / 1 失敗（理由は api_failed が出した。認証の失敗や
+# gql <JSON> GraphQL を打つ。成功なら応答を標準出力へ出す。戻り値は、0 成功 / 1 失敗（理由は api_failed が出している。認証の失敗や
 # 別の理由の 403 もここ） / 3 GraphQL を使えない環境の 403（何も出さない。呼び手が REST に替える）。
 # 戻り値 3 かどうかは ccnavi_host_graphql_blocked が決める。
 gql_text=""
@@ -192,17 +192,23 @@ gql() {
 	fi
 	rm -f "$gql_file" || :
 	if ccnavi_host_graphql_blocked "$gql_text"; then
+		# 元の返事は、REST の代わりの道も失敗したときに rest_fallback_failed が併記する。$( ) の中で呼ばれても渡るように、ファイルに残す。
+		ccnavi_host_fail_body "$gql_text" >"${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" 2>/dev/null || :
 		return 3
 	fi
 	api_failed POST graphql "$gql_text"
 	return 1
 }
 
-# GraphQL が 403 で、REST（/ccr/）の代わりの道も失敗したときの案内。REST の失敗の返事は api_failed が先に出している。
+# GraphQL が 403 で、REST（/ccr/）の代わりの道も失敗したときの案内。REST の失敗の返事は、api_failed が先に出している。
 # 打てる手が無いので、エージェントは続きを試さず、ユーザに環境の確認を頼んで止まる。
 rest_fallback_failed() {
+	gql_why_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$"
+	gql_why=$(cat "$gql_why_file" 2>/dev/null || :)
+	rm -f "$gql_why_file" || :
+	[ -z "$gql_why" ] || printf '%s: GraphQL の返事: %s\n' "$review_label" "$gql_why" >&2
 	printf '%s: %s\n' "$review_label" \
-		"この環境は GraphQL を使えず（HTTP 403）、REST の代わりの道（pulls/<N>/ccr/ と pulls/<N>/comments）も失敗しました（$1）。ホストの返事は上に出ています。認証の失敗かこの環境でのトークンの権限不足の可能性があります。エージェントは続きを試さず、ユーザに $host への接続（認証と pull request への権限）の確認を頼んで止まってください。" >&2
+		"この環境は GraphQL を使えず（HTTP 403）、REST の代わりの道（pulls/<N>/ccr/ と pulls/<N>/comments）も失敗しました（$1）。ホストの返事は上に出ています。認証の失敗かこの環境でのトークンの権限不足の可能性があります。エージェントは別の手で迂回せず（直接実装にも切り替えず）、ユーザに $host への接続（認証と pull request への権限）の確認を頼んで返事を待ち、報告して止まってください。" >&2
 }
 
 # pages <path> 100 件ずつ最後のページまで読んで 1 つの配列にする。20 ページで打ち切って失敗。
@@ -240,11 +246,11 @@ project_id() {
 	ccnavi_host_project_id
 }
 
-# ---- スレッド。GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境は REST の /ccr/ で読む）。GitLab は discussions。
+# ---- スレッド。GitHub は GraphQL で解決状態を読む（GraphQL が 403 の環境では REST の /ccr/ で読む）。GitLab は discussions。
 #
 # どちらも [{id, resolved, url, path, line, body, created_at, last_id, last_at, last_author}] を返す。
-# id は GraphQL なら スレッドの node id、REST ならスレッドの先頭コメントの id（数字。スレッド自体の id を REST は持たない）。
-# 受け入れ（accept_reply・accept_resolve）は id の形（数字だけか）で道を選ぶので、取った道と同じ道で書く。
+# id は GraphQL ならスレッドの node id、REST ならスレッドの先頭コメントの id（数字。REST にはスレッド自体の id が無い）。
+# 受け入れ（accept_reply・accept_resolve）は id の形（数字だけか）で道を選ぶ。取った道と同じ道で書く。
 
 threads() {
 	mr_number="$1"
@@ -265,7 +271,7 @@ threads() {
 			0) ;;
 			3)
 				# 最初のページで GraphQL を使えないと分かったときだけ（2 ページ目以降で変わることは無い）
-				[ "$page" -eq 0 ] || return 1
+				[ "$page" -eq 0 ] || fail graphql-changed "reviewThreads の 2 ページ目以降で GraphQL を使えなくなった。取り直してください。"
 				threads_rest "$mr_number"
 				return
 				;;
@@ -302,7 +308,7 @@ threads() {
 }
 
 # GraphQL が使えない環境で、スレッドを REST で読む。<MR の番号>
-# /ccr/review_threads は {resolved, outdated, path, line, comment_ids} だけで、スレッドの id・本文・url・作成者を持たない。
+# /ccr/review_threads が返すのは {resolved, outdated, path, line, comment_ids} だけで、スレッドの id・本文・url・作成者は含まない。
 # コメントの一覧（pulls/<N>/comments。全ページ）から、先頭のコメント（id・url・本文・作成の時刻）と最後のコメント
 # （last_*）を引く。スレッドの id は先頭コメントの id（文字列）。
 threads_rest() {
@@ -315,13 +321,26 @@ threads_rest() {
 		rest_fallback_failed "スレッドの取得"
 		return 1
 	fi
-	"$JQ" -n --argjson rt "$tr_threads" --argjson cs "$tr_comments" '
-		($cs | map({key: (.id | tostring), value: .}) | from_entries) as $m |
-		[$rt[] | ((.comment_ids // []) | map(tostring)) as $ids | select(($ids | length) > 0) |
-			($m[$ids[0]] // {}) as $f | ($m[$ids | last] // {}) as $l |
-			{id: $ids[0], resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
+	# コメントの一覧は diff_hunk を含むため大きい。引数 1 個の上限を超えるので、引数ではなくファイルで渡す。
+	tr_file="${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-threads-$$"
+	printf '%s' "$tr_threads" >"$tr_file.rt"
+	printf '%s' "$tr_comments" >"$tr_file.cs"
+	if ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.rt" >/dev/null 2>&1 || ! "$JQ" -e -s '.[0] | type == "array"' "$tr_file.cs" >/dev/null 2>&1; then
+		rm -f "$tr_file.rt" "$tr_file.cs" || :
+		printf '%s: %s\n' "$review_label" "ccr/review_threads の返事か、コメント一覧の返事が配列でない。" >&2
+		rest_fallback_failed "スレッドの取得"
+		return 1
+	fi
+	tr_rc=0
+	"$JQ" -n --slurpfile rt "$tr_file.rt" --slurpfile cs "$tr_file.cs" '
+		($cs[0] | map({key: (.id | tostring), value: .}) | from_entries) as $m |
+		[$rt[0][] | ((.comment_ids // []) | map(tostring)) as $ids | (($ids[0]) // "") as $first | (($ids | last) // "") as $final |
+			($m[$first] // {}) as $f | ($m[$final] // {}) as $l |
+			{id: $first, resolved: (.resolved // false), url: ($f.html_url // ""), path: (.path // $f.path // ""), line: (.line // $f.line // 0),
 			 body: ($f.body // ""), created_at: ($f.created_at // ""),
-			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]'
+			 last_id: (($l.id // "") | tostring), last_at: ($l.created_at // ""), last_author: ($l.user.login // "")}]' || tr_rc=$?
+	rm -f "$tr_file.rt" "$tr_file.cs" "${ccnavi_h_tmp:-${TMPDIR:-/tmp}}/ccnavi-gql-why-$$" || :
+	return "$tr_rc"
 }
 
 # ---- レビュー。変更要求の状態を CHANGES_REQUESTED にそろえる。

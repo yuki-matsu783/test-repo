@@ -25,7 +25,7 @@ accept_file=""
 # 全部に返信してから、全部を解決する（解決に失敗しても返信が重ならない順）。id は GitHub ならレビューの
 # スレッドの node id（GraphQL）か、GraphQL が 403 の環境では先頭コメントの id（数字。REST）、GitLab なら discussion の id。
 # GitHub の道は id の形で選ぶ（数字だけなら REST、でなければ GraphQL）。id は取り直した結果にあるものだけを
-# 通すので、取った道と書く道は同じになる（1 回の実行の中で混ざらない）。REST の返信は、そのスレッドの先頭コメントへの返信。
+# 通すので、取った道と書く道は同じになる（1 回の実行の中で道が混ざらない）。REST の返信は、そのスレッドの先頭コメントへの返信。
 # 呼ぶのは置く前（マーカーを置く前）。1 件でもできなければ受け入れは未完了として止める。
 #
 # ホストに書く前に、計画の id が API の経路に使える字で（GitLab は 16 進）、取り直した結果に
@@ -92,7 +92,7 @@ accept_resolve() {
 		case "$accept_id" in
 		"" | *[!0-9]*) ;;
 		*)
-			accept_res=$(api POST "repos/$path/pulls/$2/ccr/comments/$accept_id/resolve") || return 1
+			accept_res=$(api POST "repos/$path/pulls/$2/ccr/comments/$accept_id/resolve" '{}') || return 1
 			return 0
 			;;
 		esac
