@@ -7,6 +7,8 @@ title: "main.sh の引数不足時の使い方の表示を直す"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T10:03:49+0000"
+base_sha: "bfcf8cba4bf272a5cdbd1b5d8a0744513881858e"
 ---
 ## 目的
 
