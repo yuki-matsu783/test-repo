@@ -11,6 +11,9 @@ allow:
     glob: "README.md"
 started_at: "2026-10-25T04:53:37+0000"
 base_sha: "87b72f07bdd6c922805a945bd2a49b30e494f414"
+completed_at: "2026-10-25T04:55:45+0000"
+merged_sha: "9c4679d6404a8af1e3bcd036087748ed96eb9cd3"
+finished_to: "review"
 ---
 ## 目的
 
