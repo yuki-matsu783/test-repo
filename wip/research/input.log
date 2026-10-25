@@ -1,0 +1,5 @@
+  INFO start
+    ERROR disk full
+WARN a\b
+ERROR (x+y)
+plain line
