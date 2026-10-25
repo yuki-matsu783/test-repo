@@ -1,4 +1,4 @@
 version: 1
 levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: inc, points: 45, lines_over: 1, include: ["README.md"], message: README の行数}
+  - {id: untested, points: 30, judge: テストの無い振る舞いの変更を含むか, message: テストの無い変更}
