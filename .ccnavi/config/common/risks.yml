@@ -1,4 +1,4 @@
 version: 1
-levels: {medium: 5, high: 40, critical: 70}
+levels: {medium: 20, high: 40, critical: 70}
 factors:
-  - {id: any-change, points: 10, lines_over: 1, message: 変更が 1 行を超えた}
+  - {id: main-sh, points: 45, glob: "main.sh", message: main.sh に触った}
