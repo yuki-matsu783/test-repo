@@ -3,7 +3,7 @@ version: 1
 ticket: feature-96-main-sh-の使い方に終了コードと例を書く-d2-検証用
 issue: 96
 mr: 97
-title: "main.sh の使い方に終了コードと例を書く（D2 検証用）"
+title: main.sh の使い方に終了コードと例を書く（D2 検証用）
 phases:
   quick-work:
     kind: work
@@ -12,16 +12,20 @@ phases:
     scope: inherit
     when: 設計判断や並行作業が要らないとき
 plan:
-  - quick-work
-rationale: |
-  main.sh は使い方の表示で引数を示すだけで、終了コードも例も書かれていない。
+- quick-work
+rationale: 'main.sh は使い方の表示で引数を示すだけで、終了コードも例も書かれていない。
+
   スクリプトを読んだ人が、終了コードで失敗を判定できず、どう打てばよいかも分からない。
+
   使い方の説明を main.sh の中に揃えるための作業。動作は変えない。
+
+  '
 allow:
-  - match: Write|Edit
-    glob: "main.sh"
-started_at: "2026-10-25T07:39:13+0000"
-base_sha: "b814f97e16f962f2f7ce81264d2cf71b9a1442ff"
+- match: Write|Edit
+  glob: main.sh
+started_at: 2026-10-25T07:39:13+0000
+base_sha: b814f97e16f962f2f7ce81264d2cf71b9a1442ff
+feedback: []
 ---
 ## 目的
 
