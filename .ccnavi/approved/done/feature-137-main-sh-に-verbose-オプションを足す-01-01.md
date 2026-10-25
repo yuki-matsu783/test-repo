@@ -12,6 +12,7 @@ base_sha: "9decc91076137f1b005c84de702f73352328f9fc"
 completed_at: "2026-10-25T10:52:23+0000"
 merged_sha: "97224f6b53dbf603767c7f31ec2c7246fff67a50"
 finished_to: "review"
+settled_by: "confirm"
 ---
 ## 目的
 
