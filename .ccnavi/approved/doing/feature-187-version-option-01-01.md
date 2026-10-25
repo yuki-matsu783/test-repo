@@ -14,6 +14,8 @@ allow:
     glob: "tests/*"
   - match: Write|Edit
     glob: "docs/wiki/*"
+started_at: "2026-10-25T21:58:47+0000"
+base_sha: "75d83d986b2272417f90fbf98fb0dc171461bfcd"
 ---
 親の範囲の中で次をする。
 
