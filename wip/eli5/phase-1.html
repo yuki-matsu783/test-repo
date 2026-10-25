@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 1 の説明（やさしい版）</title>
+<style>
+  body {
+    margin: 0;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    line-height: 1.7;
+    color: #1f2328;
+    background: #ffffff;
+  }
+  main { max-width: 680px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin: 0.5em 0; }
+  h2 { font-size: 1.1rem; margin-top: 1.6em; border-left: 4px solid #0969da; padding-left: 8px; }
+  .box { background: #f6f8fa; border-radius: 8px; padding: 12px 16px; }
+  code { background: #eef1f4; padding: 1px 4px; border-radius: 4px; }
+  ol li, ul li { margin-bottom: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>フェーズ 1：テキスト整形ツールの説明を足した</h1>
+
+  <h2>いちばん大事なこと</h2>
+  <div class="box">
+    <p>ツールの動きは変えていません。<code>main.sh</code> の一番上に、使い方を書いたメモ（コメント）を 3 行足しただけです。</p>
+  </div>
+
+  <h2>何をしたか</h2>
+  <ul>
+    <li>ツールの作り方が書かれた README と、<code>main.sh</code> の中身を見比べました。</li>
+    <li>ずれは見つからなかったので、直したところはありません。</li>
+    <li>メモを 3 行足しました。「どう使うか」「3 つの引数が何か」「絞り込みの言葉が空のときはどうなるか」を書いています。</li>
+  </ul>
+
+  <h2>変わったファイル</h2>
+  <ul>
+    <li><code>main.sh</code>：上の 3 行のメモを足した（ほかの行は同じ）。</li>
+  </ul>
+
+  <h2>確かめたこと</h2>
+  <ul>
+    <li>引数が足りないとき：使い方が表示されて、エラーで終わる。</li>
+    <li>入力ファイルが無いとき：「見つかりません」と表示されて、エラーで終わる。</li>
+    <li>言葉に合う行があるとき：番号が付いて、行の頭の空白が消えた形で、出力ファイルができる。</li>
+    <li>言葉に合う行が無いとき：中身が空の出力ファイルができて、正常に終わる。</li>
+  </ul>
+  <p>まだ確かめていないのは、「絞り込みの言葉を空にしたら全部の行が残る」という点です。コードを読んで、そうなると判断しました。</p>
+
+  <h2>リスク</h2>
+  <div class="box">
+    <p>低いです。動くコードは変わらず、メモを足しただけなので、壊れる場所はほとんどありません。</p>
+  </div>
+
+  <h2>次にすること</h2>
+  <p>内容がよければ、レビューで「いいです」と返してください。直したいところがあれば、そのまま伝えてください。</p>
+</main>
+</body>
+</html>
