@@ -7,6 +7,8 @@ title: "main.sh の使い方の表示を直す"
 allow:
   - match: Write|Edit
     glob: "main.sh"
+started_at: "2026-10-25T09:38:37+0000"
+base_sha: "20d82cac706c6e0e767dfd1690d73c036f01810d"
 ---
 ## 目的
 
