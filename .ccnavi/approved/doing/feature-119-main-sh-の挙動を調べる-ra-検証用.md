@@ -24,6 +24,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T09:53:30+0000"
+base_sha: "260120afae8583c95182105abe048cee63d47a9c"
 ---
 
 ## 目的
