@@ -8,6 +8,8 @@ title: "main.sh の挙動を調べる（調査）"
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T09:59:07+0000"
+base_sha: "5cb294658b432715baa6bae1539757b4130d9824"
 ---
 ## 目的
 
