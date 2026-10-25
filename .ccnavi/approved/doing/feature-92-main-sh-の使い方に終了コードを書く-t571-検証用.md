@@ -19,6 +19,8 @@ rationale: |
 allow:
   - match: Write|Edit
     glob: "main.sh README.md"
+started_at: "2026-10-25T07:30:19+0000"
+base_sha: "c9393ba9f65029ad5a1609153f8c343dc469cd8f"
 ---
 ## 目的
 
