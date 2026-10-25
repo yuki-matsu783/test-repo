@@ -15,9 +15,9 @@ rationale: 'フェーズ 1 のレビューで残った指摘に応える。ユ�
 allow:
 - match: Write|Edit
   glob: main.sh
-started_at: ''
+started_at: "2026-10-25T07:44:30+0000"
 completed_at: ''
-base_sha: ''
+base_sha: "ee046544d27df21c7c1b80fe42cf787d933b7d31"
 merged_sha: ''
 followup_of:
 - feature-96-main-sh-の使い方に終了コードと例を書く-d2-検証用-01-01
