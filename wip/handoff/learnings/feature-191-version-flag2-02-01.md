@@ -1,0 +1,8 @@
+---
+ticket: feature-191-version-flag2-02-01
+parent: feature-191-version-flag2
+learnings: recorded
+---
+
+- 子のワークツリーに置いた新しい reference は、`ccnavi-launcher.sh --docs` の検索範囲（ワークスペースのルート。`.claude/worktrees/` は .gitignore で外れる）に入らない。「引けること」の確かめは、親が取り込んだあと、メインのツリーで同じコマンドを打って行う。子の中で 0 件になっても、keywords のせいにしない。
+- 子のワークツリーでは、生の `ls`・`git` の直接実行がガードで止まる。読みも操作も `ccnavi-git.sh` を通す。
