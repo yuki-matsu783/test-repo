@@ -1,0 +1,32 @@
+name: feature
+description: 新機能を設計・受入テスト・実装の順に進める
+when: 新しい機能を足すとき。振る舞いが変わり、設計が要るとき
+plan:
+  - design
+  - {type: acceptance, after: [1]}
+  - {type: implement, after: [1, 2]}
+feedback:
+  - implement-feedback
+flows:
+  1:
+    id: wf-design
+    name: 設計の手順
+    version: 1.0.0
+    nodes:
+      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}
+      - {id: p, type: prompt, name: 設計の手順, position: {x: 1, y: 0}, data: {prompt: "設計メモを wip/design/ に書く。TPLMARK-DESIGN"}}
+      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}
+    connections:
+      - {id: c1, from: s, to: p, fromPort: output, toPort: input}
+      - {id: c2, from: p, to: e, fromPort: output, toPort: input}
+  3:
+    id: wf-impl
+    name: 実装の手順
+    version: 1.0.0
+    nodes:
+      - {id: s, type: start, name: 開始, position: {x: 0, y: 0}, data: {}}
+      - {id: p, type: prompt, name: 実装の手順, position: {x: 1, y: 0}, data: {prompt: "先にテストを通る形にしてから実装する。TPLMARK-IMPL"}}
+      - {id: e, type: end, name: 終了, position: {x: 2, y: 0}, data: {}}
+    connections:
+      - {id: c1, from: s, to: p, fromPort: output, toPort: input}
+      - {id: c2, from: p, to: e, fromPort: output, toPort: input}

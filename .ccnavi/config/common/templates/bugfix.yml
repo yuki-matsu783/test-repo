@@ -1,0 +1,6 @@
+name: bugfix
+description: 原因が分からない不具合を、調査してから直す
+when: 不具合の原因が分からないとき。再現手順の調査が先に要るとき
+plan:
+  - research
+  - {type: implement, after: [1]}
