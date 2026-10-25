@@ -10,6 +10,8 @@ human_review:
 allow:
   - match: Write|Edit
     glob: "wip/research/*"
+started_at: "2026-10-25T11:10:10+0000"
+base_sha: "a0502e58d190d9c10cefb66e49344ab5e5c1fd8b"
 ---
 ## 目的
 
