@@ -231,7 +231,7 @@ is_importable() {
 		case "${im_b#*/templates/}" in */*) return 1 ;; esac
 		return 0
 		;;
-	.ccnavi/config/common/messages/*.yml | .ccnavi/config/project/messages/*.yml)
+	.ccnavi/config/common/messages/*.yml)
 		case "${im_b#*/messages/}" in */*) return 1 ;; esac
 		return 0
 		;;
@@ -297,7 +297,7 @@ done
 [ "$bad" -eq 0 ] || exit 2
 
 if [ -z "$commands" ]; then
-	[ -z "$staged" ] || printf '次: 下書きを編集する。すべて直したら、下書きを作ったのと同じツリーの中で sh %s/.ccnavi/scripts/ccnavi-stage.sh --commands %s を打つ（種類ごとに、取り込みの手順か差し替えの mv が出る）\n' "$root" "$staged"
+	[ -z "$staged" ] || ccnavi_text "$root" NEXT_STAGE_EDIT "staged_q=$staged"
 	exit 0
 fi
 
@@ -326,5 +326,5 @@ if [ -n "$mvs" ]; then
 	guide="${guide:+$guide と }mv"
 fi
 [ -z "$missing$same$changed" ] || exit 1
-printf '次: 上の%sをユーザに案内してターンを終える\n' "$guide"
-printf '案内: 非対話セッションでは、編集済みの下書きを push し、確認と取り込み（差し替え）をユーザに頼んでターンを終える\n'
+ccnavi_text "$root" NEXT_STAGE_GUIDE "guide=$guide"
+ccnavi_text "$root" NOTE_STAGE_NONINTERACTIVE

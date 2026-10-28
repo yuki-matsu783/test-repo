@@ -1,5 +1,0 @@
-name: quickfix
-description: 1 ファイルの文言・設定値などの小さい修正
-when: 文言の修正や、設計が要らない小さい変更のとき
-plan:
-  - quick-work

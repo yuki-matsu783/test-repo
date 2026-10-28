@@ -202,39 +202,12 @@ unattended_line() {
 
 # 最後の行（名前の警告よりも後）に出す次の一手。コマンドは 1 行で完結する形にする。
 print_next() {
-	pn_q=$(ccnavi_sh_quote "$dest")
-	pn_g="sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh")"
-	printf '次: 編集はこのワークツリーの下で行います（Write / Edit に渡すパス: %s/…）。git は `cd %s && %s <サブコマンド>` の形で実行します。終わったらコミットし、ターンの終わりの integrate の案内に従います\n' "$dest" "$pn_q" "$pn_g"
+	ccnavi_text "$root" NEXT_WORKTREE_EDIT "dest=$dest"
 }
-
-if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
-	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
-	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
-		/^worktree / { p = substr($0, 10) }
-		/^branch / { if (p == want) print substr($0, 8) }')
-	[ "$have" = "refs/heads/$name" ] ||
-		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
-	printf 'ワークツリーは既にある: %s\n' "$dest"
-	# 取り込みの記録（--adopt が読む場所）があるかを確かめます。無いと integrate に進めません。
-	ex_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
-	if [ -n "$ex_common" ] && [ -e "$(ccnavi_phys "$ex_common")/ccnavi-direct/$name" ]; then
-		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進めます\n' "$name"
-		ex_record=yes
-	else
-		printf '案内: 取り込みの記録は、無い（ccnavi-direct/%s）。integrate に進むには、ユーザの確認を経て sh %s %s --adopt --base <取り込み先> で引き取ります（チケットに結び付く名前は引き取れません）。%s\n' \
-			"$name" "$(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh")" "$(ccnavi_sh_quote "$name")" "$(unattended_line)"
-		ex_record=no
-	fi
-	log_info 既にある -- "name=$name" "record=$ex_record"
-	print_next
-	exit 0
-fi
-if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
-	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段の手順が要ります。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
-fi
 
 # 同じ識別子になる別のブランチ（feature/7-x に対する feature-7-x、英字の大文字小文字だけ違う名前）があれば止める。
 # <一覧のファイル> <どこ（手元・origin）>
+# dest-exists・既にあるワークツリーの分岐・branch-exists の検査より前に置く。大文字小文字を区別しない機械では、綴り違いの名前のパスが既にあるように見えるため。
 heads_list="$root/logs/state/worktree-heads-$$"
 cand_index="$root/logs/state/worktree-index-$$"
 mkdir -p "$root/logs/state" 2>/dev/null || :
@@ -253,6 +226,33 @@ same_id_guard() {
 	git for-each-ref --format='%(refname:lstrip=3)' refs/remotes/origin 2>/dev/null | grep -v -x 'HEAD' || :
 } >"$heads_list"
 [ -n "$adopt" ] || same_id_guard "$heads_list" 手元
+
+if [ -z "$adopt" ] && { [ -e "$dest" ] || [ -L "$dest" ]; }; then
+	# 在るのは、このリポジトリのワークツリーで、同じ名前のブランチを開いているときだけ成功にする。
+	have=$(git worktree list --porcelain 2>/dev/null | awk -v want="$(ccnavi_phys "$dest")" '
+		/^worktree / { p = substr($0, 10) }
+		/^branch / { if (p == want) print substr($0, 8) }')
+	[ "$have" = "refs/heads/$name" ] ||
+		fail dest-exists "${dest} は既にありますが、ブランチ ${name} を開いているこのリポジトリのワークツリーではありません（${have:-ワークツリーの登録が無い}）。中身を確かめ、不要ならユーザに確かめてから片付け、別の名前で再実行してください。"
+	printf 'ワークツリーは既にある: %s\n' "$dest"
+	# 取り込みの記録（--adopt が読む場所）があるかを確かめます。無いと integrate に進めません。
+	ex_common=$(git -C "$top" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || :)
+	if [ -n "$ex_common" ] && [ -e "$(ccnavi_phys "$ex_common")/ccnavi-direct/$name" ]; then
+		printf '案内: 取り込みの記録は、ある（ccnavi-direct/%s）。integrate に進めます\n' "$name"
+		ex_record=yes
+	else
+		ex_name_q=$(ccnavi_sh_quote "$name")
+		ex_unattended=$(unattended_line)
+		ccnavi_text "$root" NOTE_WORKTREE_RECORD_MISSING "name=$name" "name_q=$ex_name_q" "unattended=$ex_unattended"
+		ex_record=no
+	fi
+	log_info 既にある -- "name=$name" "record=$ex_record"
+	print_next
+	exit 0
+fi
+if [ -z "$adopt" ] && git show-ref --verify --quiet "refs/heads/$name"; then
+	fail branch-exists "ブランチ ${name} が既にあります（ワークツリーはありません）。既にあるブランチを出すには、2 段の手順が要ります。1 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-git.sh") worktree add $(ccnavi_sh_quote ".claude/worktrees/${name}") $(ccnavi_sh_quote "$name")。2 段目: sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base <統合先> で引き取ります（引き取らないと integrate できません。引き取りにはユーザの確認が要ります）。新しく切るなら別の名前にしてください。$(unattended_line)"
+fi
 
 # ---- C1〜C3。先に断るもの。
 # 取り込み先は、ユーザのチェックアウト（git worktree listの先頭）が開いているブランチ。
@@ -353,7 +353,7 @@ if [ -n "$adopt" ]; then
 	ad_code=$(printf '%s' "$ad_input" | git hash-object --stdin | cut -c1-8)
 	ad_report() {
 		printf '引き取りの確認が要る: 記録はまだ書いていない。\n'
-		[ "$1" != code ] || printf '案内: 渡された確認コードが今の状態と合わない（報告のあとでブランチか取り込み先が動いた）。報告からやり直す。\n'
+		[ "$1" != code ] || ccnavi_text "$root" NOTE_WORKTREE_ADOPT_CODE_STALE
 		printf '状態:\n'
 		printf '  取り込み先 %s (%s)\n' "$target" "$main_tree"
 		printf '  ワークツリー %s（ブランチ %s。先頭 %s）\n' "$dest" "$name" "$(git rev-parse --short "$ad_tip")"
@@ -363,9 +363,8 @@ if [ -n "$adopt" ]; then
 		printf '取り込みの差分:\n'
 		git diff --stat "$ad_s" "$ad_tip" 2>/dev/null | head -n 50 | sed 's/^/  /'
 		printf '了承の文面: この範囲全体をエージェントの成果として扱う。範囲に他人のコミットや、取り込み先に入れたくない変更が混ざっていないかを、ユーザに確かめる\n'
-		ad_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name") --adopt --base $(ccnavi_sh_quote "$target") --accept $ad_code"
-		printf '次: 上をユーザに伝えて了承を得てから、%s\n' "$ad_cmd"
-		printf '案内: 横で作業する（ルートの変更を自動で戻さない）なら、了承を得たうえで --side-by-side を付ける\n'
+		ccnavi_text "$root" NEXT_WORKTREE_ADOPT "name=$name" "target=$target" "code=$ad_code"
+		ccnavi_text "$root" NOTE_WORKTREE_SIDE_BY_SIDE
 	}
 	log_info 引き取りを調べた -- "name=$name" "target=$target" "s=$ad_s" "tip=$ad_tip"
 	if [ -n "$dry" ]; then
@@ -569,7 +568,7 @@ report_and_stop() {
 	[ -z "$cand" ] || git update-ref "$ref_pending" "$cand" 2>/dev/null || :
 	log_info 確認が要る -- "name=$name" "target=$target" "c4=$c4" "c5=$c5" "c6=$c6" "c7=$c7" "why=$rs_why"
 	printf '確認が要る: ワークツリーはまだ切っていない。\n'
-	[ "$rs_why" = "code" ] && printf '案内: 渡された確認コードが今の状態と合わない（報告のあとで状態が動いた）。報告からやり直す。\n'
+	[ "$rs_why" = "code" ] && ccnavi_text "$root" NOTE_WORKTREE_CODE_STALE
 	printf '状態:\n'
 	printf '  取り込み先 %s (%s)。リモートのデフォルトは %s\n' "$target" "$main_tree" "$integ"
 	[ "$c4" = no ] || printf '  cwd のブランチは %s で、取り込み先と違う\n' "${top_branch:-ブランチの外}"
@@ -628,12 +627,13 @@ report_and_stop() {
 	printf '  横で作業するか (--side-by-side)\n'
 	printf '    このワークツリーが残っている間は、%s で見つかった変更（エージェントが Bash で書き換えた分も含む）を\n' "$main_tree"
 	printf '    自動で戻さず、報告にする。ccnavi の設定ファイルは戻す\n'
-	rs_cmd="sh $(ccnavi_sh_quote "$scripts/ccnavi-worktree.sh") $(ccnavi_sh_quote "$name")"
-	[ "$c4" = no ] || rs_cmd="$rs_cmd --base $rs_target_q"
-	[ "$need_accept" = no ] || rs_cmd="$rs_cmd --accept $code"
-	[ "$c7" = no ] || rs_cmd="$rs_cmd --no-wip"
-	printf '次: 上をユーザに伝えて決めてもらう。合わせたら同じコマンドを打ち直す。このまま進めるなら例えば %s\n' "$rs_cmd"
-	printf '案内: ユーザの了承を得るまで --base・--accept・--side-by-side を付けない。確認コードは今の状態から決まるので、状態が動いたら報告からやり直す\n'
+	rs_args=""
+	[ "$c4" = no ] || rs_args="$rs_args --base $rs_target_q"
+	[ "$need_accept" = no ] || rs_args="$rs_args --accept $code"
+	[ "$c7" = no ] || rs_args="$rs_args --no-wip"
+	# 先頭の空白は文面の側が持つ（値の前後の空白は落ちる）。
+	ccnavi_text "$root" NEXT_WORKTREE_CONFIRM "name=$name" "args_q=${rs_args# }"
+	ccnavi_text "$root" NOTE_WORKTREE_WAIT_FOR_OK
 	exit "$EXIT_CONFIRM"
 }
 
@@ -714,11 +714,11 @@ fi
 if [ "$c6" = yes ]; then
 	case "$remote_state" in
 	behind | diverged)
-		printf '案内: 手元の %s は origin/%s より古い（遅れ %s 件）。push の前に合わせ直しが要る: cd %s && git pull --ff-only origin %s\n' "$target" "$target" "$remote_behind" "$(ccnavi_sh_quote "$main_tree")" "$(ccnavi_sh_quote "$target")"
+		ccnavi_text "$root" NOTE_WORKTREE_REMOTE_BEHIND "target=$target" "behind=$remote_behind" "main_tree=$main_tree" "branch=$target"
 		;;
 	ahead) printf '案内: 手元の %s は origin/%s より %s 件進んでいる（まだ送っていない）\n' "$target" "$target" "$remote_ahead" ;;
 	absent) printf '案内: origin に %s が無い。成果は手元の %s に載る\n' "$target" "$target" ;;
-	unverified) printf '案内: リモート未確認で切った。つながったら ccnavi-git.sh fetch origin %s で確かめ、遅れていれば取り込む前に合わせる。ユーザにも伝える\n' "$target" ;;
+	unverified) ccnavi_text "$root" NOTE_WORKTREE_REMOTE_UNVERIFIED "target=$target" ;;
 	esac
 fi
 # ワークスペースのルートで実行され、projects/ の下にリポジトリがあるときは、projects/ の変更なら
@@ -730,10 +730,21 @@ root_cmp=$(ccnavi_phys "$root" | tr '[:upper:]' '[:lower:]')
 if [ "$top_cmp" = "$root_cmp" ]; then
 	for pj_git in "$root"/projects/*/.git; do
 		if [ -e "$pj_git" ]; then
-			printf '案内: projects/ の下のプロジェクトの変更を頼まれたなら、このワークツリーはワークスペース自身のリポジトリから作られている。このワークツリーを片付け、projects/<名前> へ cd してから実行し直す\n'
+			ccnavi_text "$root" NOTE_WORKTREE_PROJECTS_HINT
 			break
 		fi
 	done
+fi
+# 親のワークツリーから切り替えたとき、承認待ちの提案・着手中の子・MR は取り下げられずに残る。
+# 何が残っているかは実行ファイルに聞く（sh はチケットの置き場を読まない）。聞けないときは何も出さない。
+lo_name=$(basename "$top")
+lo_out=$(ccnavi_ask "$root" tree leftover "$top" "$lo_name") || lo_out=""
+lo_get() { printf '%s\n' "$lo_out" | sed -n "s/^$1 //p" | head -n 1; }
+if [ "$(printf '%s\n' "$lo_out" | head -n 1)" = "tree 1" ] && [ "$(lo_get leftover)" = yes ]; then
+	ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER "parent=$lo_name"
+	[ "$(lo_get proposal)" != yes ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_PROPOSAL "parent=$lo_name"
+	[ "$(lo_get doing)" = 0 ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_DOING "count=$(lo_get doing)"
+	[ "$(lo_get mr)" = - ] || ccnavi_text "$root" NOTE_WORKTREE_LEFTOVER_MR "mr=#$(lo_get mr)"
 fi
 print_next
 log_info 完了 -- "name=$name" "target=$target" "snap=$s_sha" "wip=$s_wip" "side=$side_word"

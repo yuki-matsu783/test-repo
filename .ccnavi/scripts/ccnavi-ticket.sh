@@ -14,6 +14,7 @@
 # propose は、書いた承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を
 # 親のブランチへコミットして push する。別のPCで承認して作業に入るために、承認を頼む前に打つ。
 # 提案を書く親のワークツリーで足りる（親子の識別子を渡す）。送るのは親子の提案だけ。サブエージェントからは打てない。
+# 親の提案は、送る前に計画の after の形と終端だけを検査し、誤りなら何も送らずに止まる（実行ファイル側の検査）。
 # 親のブランチに未 push のコード（承認済みの置き場と提案の置き場の外）の変更があれば、一緒に公開しないよう止める。
 # 送れなかったときも、書いた提案はワークツリーに残す（戻すのは自分のコミットだけ）。
 #
@@ -80,7 +81,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh <start|finish|cancel|propose> <識別子> [-
 sh .ccnavi/scripts/ccnavi-ticket.sh consolidate <親>
 sh .ccnavi/scripts/ccnavi-ticket.sh record-risk <子> <項目> yes|no --reason <根拠>
 sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] [--signal <信号>]
-（親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>）
+（親の提案の雛形はこのスクリプトに無い: ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>）
 
   status      承認済みチケットの状態を聞く（読むだけ。サブエージェントからも実行できます）。親を省けば
                作業中・レビュー待ち・承認待ちのチケットがある親子を全部。ファイルを読んで推測せず、これを実行する
@@ -89,7 +90,7 @@ sh .ccnavi/scripts/ccnavi-ticket.sh learn [--note <本文>] [--target <種類>] 
                次の通し番号、<先頭の語> <slug> を渡せば <先頭の語>-<番号>-<slug> を 1 行で出す。
                末尾が -<2 桁> になる slug や、推奨される長さを超える slug を指定すると、理由を表示して終了します。
                親チケットの識別子は issue から決まる（ccnavi-start.sh --issue）。提案の雛形は、実行ファイルの
-               `ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <値> --mr <番号>` が識別子のワークツリーの中で作る
+               `ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <値> --mr <番号>` が識別子のワークツリーの中で作る
                （このスクリプトに new は無い。手で書かない）
 
   propose      承認待ちの提案（wip/proposals/todo/）と子のフローの下書き（wip/proposals/flows/）を親のブランチへ
@@ -144,7 +145,7 @@ case "$1" in
 status | next-id | start | finish | cancel | propose | consolidate | record-risk | learn) ;;
 *)
 	printf 'ccnavi-ticket: 未対応のサブコマンドです：%s。使用できるサブコマンドは status / next-id / start / finish / cancel / propose / consolidate / record-risk / learn です。\n' "$1" >&2
-	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <題> --plan <型,…> --issue <番号> --mr <番号> [--scope <glob>]（識別子のワークツリーの中で打つ。チケット作業は issue と MR のセット。issue の番号をユーザに聞き（無ければユーザに作ってもらい）、ccnavi-start.sh --issue <番号> でワークツリーと MR を作ると、識別子と --issue・--mr の値が出る）。\n' >&2
+	[ "$1" != new ] || printf '親の提案の雛形は、このスクリプトではなく実行ファイルが作ります: ccnavi ticket new <識別子> --title <タイトル> --plan <型,…> --issue <番号> --mr <番号> [--scope <glob>]（識別子のワークツリーの中で打つ。チケット作業は issue と MR のセット。issue の番号をユーザに聞き（無ければユーザに作ってもらい）、ccnavi-start.sh --issue <番号> でワークツリーと MR を作ると、識別子と --issue・--mr の値が出る）。\n' >&2
 	exit 2
 	;;
 esac
@@ -329,14 +330,14 @@ ticket_unsent_parent_next() {
 		printf '  1. issue に紐づく MR がすでにある: その MR のブランチで作業するかを聞く。作業するなら sh %s --mr %s（--issue <番号> と一緒に渡せる）\n' "$tup_s" "$tup_mr"
 		printf '  2. MR は無く、issue はある: %s を使わず sh %s --issue <番号> で新しく切る（ブランチ・ワークツリー・Draft MR を作る）。提案は新しい親のワークツリーへ移す。%s にコミットがあれば先に伝える\n' "$tup_b" "$tup_s" "$tup_b"
 		printf '  3. %s を使い続ける: ユーザが git push -u origin %s と MR（説明欄に Closes #<番号>）の作成をしてから、sh %s --mr %s で採用する\n' "$tup_b" "$tup_b" "$tup_s" "$tup_mr"
-		printf '案内: issue が無いときは、sh %s --new-issue <題> で作ってから 2 へ進む\n' "$tup_s"
+		ccnavi_text "$root" NOTE_TICKET_NEW_ISSUE
 	} >&2
 }
 
 ticket_preflight() {
 	ccnavi_preflight "${ccnavi_wap_tree:-$here}"
 	[ "$ccnavi_pf_result" != ok ] || return 0
-	for tp_item in tools origin integration api access git; do
+	for tp_item in tools origin integration api access git ident; do
 		eval "tp_kind=\$ccnavi_pf_$tp_item"
 		[ "$tp_kind" != ok ] || { [ "$tp_item" = access ] && [ -n "$ccnavi_pf_access_unknown" ]; } || continue
 		ccnavi_pf_line "$tp_item"
@@ -413,7 +414,7 @@ start | finish | cancel | propose | consolidate)
 		if [ "$wap_rc" -eq 0 ] && [ "$1" = propose ]; then
 			# 送り終えたあとの案内。出力先が閉じていても、送った結果を失敗にしない（この 1 行の間だけ PIPE を無視する）。
 			trap '' PIPE
-			printf '次: ユーザに承認を頼んで返事を待つ。承認が済むまで実装はしない\n' 2>/dev/null || :
+			ccnavi_text "$root" NEXT_TICKET_PROPOSED 2>/dev/null || :
 			trap - PIPE
 		fi
 		[ "$wap_rc" -ne 0 ] || tidy_after "$@"
