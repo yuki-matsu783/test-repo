@@ -1,0 +1,19 @@
+{
+ "points": 50,
+ "level": "HIGH",
+ "hits": [
+  {
+   "id": "fixed",
+   "points": 50,
+   "detail": "固定の点（測れなかった: .ccnavi/config/common/scripts/fixed.sh が 3 で終わった）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [
+  "fixed: .ccnavi/config/common/scripts/fixed.sh が 3 で終わった"
+ ],
+ "head": "8535f87b3b2802e827e9ab2e220e609b41d8ce3f",
+ "base": "be7d80bf7bb942f6e271406bfe9e23ec44a1f41b",
+ "at": "2026-10-25T10:11:17+0000",
+ "summary": "3 ファイル、+19 -2 行、削除したファイル 0"
+}
