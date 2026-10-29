@@ -1,0 +1,17 @@
+{
+ "points": 35,
+ "level": "MEDIUM",
+ "hits": [
+  {
+   "id": "learn-glob",
+   "points": 35,
+   "detail": "学びの記録に触れた（wip/handoff/learnings/feature-129-main-sh-の使い方の説明を直す-c4-検証用-01-01.digest.json, wip/handoff/learnings/feature-129-main-sh-の使い方の説明を直す-c4-検証用-01-01.md）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "33bd0444730d591c6ef5b2fe6651bb739b4be115",
+ "base": "6ec61728fa256e5576431cf7ce520591f8b7e8b7",
+ "at": "2026-10-25T10:20:57+0000",
+ "summary": "3 ファイル、+17 -0 行、削除したファイル 0"
+}
