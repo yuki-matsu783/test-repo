@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>main.sh の使い方に例を足す（フェーズ 1）</title>
+<style>
+  body { font-family: sans-serif; line-height: 1.7; margin: 0 auto; max-width: 720px; padding: 16px; color: #222; background: #fff; }
+  h1 { font-size: 1.4em; }
+  h2 { font-size: 1.1em; margin-top: 1.6em; }
+  pre { background: #f4f4f4; padding: 8px 12px; overflow-x: auto; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>main.sh の使い方に例を足す（フェーズ 1）</h1>
+
+<h2>何を変えたか</h2>
+<p>main.sh の冒頭にある「使い方の例」に、2 つの例を足しました。動く処理は変えていません。</p>
+<ul>
+  <li><code>sh main.sh access.log "" all</code>：絞り込みの言葉を空にすると、全部の行が残ることを示す例です。結果は <code>all.txt</code> に書かれます。</li>
+  <li><code>sh main.sh access.log WARN warn-log</code>：出力の名前を変える例です。結果は <code>warn-log.txt</code> に書かれます。</li>
+</ul>
+
+<h2>なぜ変えたか</h2>
+<p>初めて使う人が、絞り込みの言葉を空にしたときや、出力の名前を変えたときにどうなるかを、ファイルを開かなくても分かるようにするためです。</p>
+
+<h2>確かめたこと</h2>
+<ul>
+  <li>小さな入力ファイルで 2 つの例を実際に動かし、<code>all.txt</code> に 4 行すべてが番号付きで出ること、<code>warn-log.txt</code> に WARN の行だけが出ることを確かめました。</li>
+  <li>入力ファイルが無いときの動きは変わっていないことを確かめました（終了コード 1 で終わります）。</li>
+  <li>変更は冒頭のコメントの 4 行だけです。</li>
+</ul>
+
+<h2>リスク</h2>
+<p>低いです。書き換えたのはコメントだけで、プログラムの動きには影響しません。</p>
+</body>
+</html>
