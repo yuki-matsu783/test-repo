@@ -1,0 +1,17 @@
+{
+ "points": 10,
+ "level": "MEDIUM",
+ "hits": [
+  {
+   "id": "any-change",
+   "points": 10,
+   "detail": "変更が 1 行を超えた（27 行 > 1）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "c19cffa8c405a519aa809d08f00e0f04bb8256d2",
+ "base": "20d82cac706c6e0e767dfd1690d73c036f01810d",
+ "at": "2026-10-25T09:40:11+0000",
+ "summary": "3 ファイル、+23 -4 行、削除したファイル 0"
+}
