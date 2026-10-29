@@ -1,0 +1,39 @@
+---
+version: 1
+ticket: feature-135-main-sh-の使い方の説明を直す-c6b-検証用-01-01
+parent: feature-135-main-sh-の使い方の説明を直す-c6b-検証用
+phase: 1
+title: "main.sh 冒頭の使い方の説明を実際の動きに合わせる（フェーズ 1）"
+rationale: |
+  main.sh 冒頭の説明に、出力先の上書き、行頭の空白が落ちること、部分一致の絞り込みが書かれていない。動きは変えず、説明だけ足す。
+allow:
+  - match: Write|Edit
+    glob: "main.sh"
+started_at: "2026-10-25T10:34:25+0000"
+base_sha: "bd911f5679d643ae48d45610f2933e37fe91af68"
+completed_at: "2026-10-25T10:36:17+0000"
+merged_sha: "9016a50e8d0a98995361c4e079ee30db0fd98f9f"
+finished_to: "review"
+---
+## 目的
+
+main.sh 冒頭のコメントに、次の 3 点を書き足す。
+
+- 出力の `<出力の接頭辞>.txt` は、実行のたびに上書きされる。
+- 出力の各行は、入力の行頭の空白を除き、番号を振って書かれる。
+- 絞り込みパターンは正規表現ではなく、文字列の部分一致で行を選ぶ。
+
+## 範囲
+
+- main.sh 冒頭のコメント行だけ。
+
+## 対象外
+
+- main.sh の処理（awk の部分、引数の検査、終了コード）。
+- 親の範囲の外のファイル。
+
+## 完了の確かめ方
+
+- `ccnavi-git.sh diff` の差分がコメント行だけであること。
+- `sh -n main.sh` が通ること。
+- 直す前と後で、引数なし、存在しない入力、例（`access.log ERROR errors`）の出力と終了コードが同じこと。
