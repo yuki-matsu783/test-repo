@@ -1,0 +1,23 @@
+{
+ "points": 30,
+ "level": "MEDIUM",
+ "hits": [
+  {
+   "id": "a",
+   "points": 15,
+   "detail": "項目 a（スクリプト）",
+   "source": "common"
+  },
+  {
+   "id": "b",
+   "points": 15,
+   "detail": "項目 b（スクリプト）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "c0bb4915b58f9dfe6e7ca7ffa4105c9228a60ab6",
+ "base": "b5f51a349d4bcefa8e8f1fd77a9a8e286a251931",
+ "at": "2026-10-25T10:16:47+0000",
+ "summary": "3 ファイル、+19 -0 行、削除したファイル 0"
+}
