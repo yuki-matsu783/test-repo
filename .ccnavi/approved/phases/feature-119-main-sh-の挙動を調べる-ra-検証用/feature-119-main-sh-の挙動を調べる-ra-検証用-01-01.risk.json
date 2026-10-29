@@ -1,0 +1,17 @@
+{
+ "points": 39,
+ "level": "MEDIUM",
+ "hits": [
+  {
+   "id": "fixed",
+   "points": 39,
+   "detail": "固定の点（スクリプト）",
+   "source": "common"
+  }
+ ],
+ "unmeasured": [],
+ "head": "b30a618e5284a53c775637cba3a37a893df1d5ed",
+ "base": "70bd561a1c9d40ad49f819f21c62765ac83ec89e",
+ "at": "2026-10-25T09:55:52+0000",
+ "summary": "14 ファイル、+83 -0 行、削除したファイル 0"
+}

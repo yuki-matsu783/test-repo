@@ -1,0 +1,7 @@
+1. ERROR one
+2. ERROR two
+3. \u3000ERROR full
+4. ok line
+5. C:\path ERROR back
+6. star * line
+7. 
