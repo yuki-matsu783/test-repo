@@ -1,0 +1,7 @@
+ticket: feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用-01-01
+parent: feature-102-main-sh-の使い方の表示を-1-行足す-c3-検証用
+steps:
+  - main.sh の引数不足の if の中の echo の後に、出力先を示す 1 行を足す（その 1 行だけ）
+  - sh main.sh を引数なしで打ち、使い方が 3 行出て終了コード 1 になることを確かめる
+  - sh main.sh access.log ERROR errors を打ち、errors.txt の中身が変更前と同じことを確かめる
+  - 変更を子のワークツリーでコミットする（push と合流はしない）
