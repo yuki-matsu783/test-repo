@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>フェーズ 1 調査のやさしい説明</title>
+<style>
+  :root { --fg: #1d1d1f; --muted: #6e6e73; --bg: #ffffff; --accent: #0b6bcb; --card: #f5f5f7; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --fg: #f5f5f7; --muted: #a1a1a6; --bg: #1c1c1e; --accent: #4da3ff; --card: #2c2c2e; }
+  }
+  :root[data-theme="dark"] { --fg: #f5f5f7; --muted: #a1a1a6; --bg: #1c1c1e; --accent: #4da3ff; --card: #2c2c2e; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; line-height: 1.7; }
+  main { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 8px; }
+  h2 { font-size: 1.15rem; margin: 32px 0 8px; color: var(--accent); }
+  p, li { font-size: 1rem; }
+  .lead { color: var(--muted); margin-top: 0; }
+  .card { background: var(--card); border-radius: 12px; padding: 14px 16px; margin: 12px 0; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.92em; word-break: break-all; }
+</style>
+</head>
+<body>
+<main>
+  <h1>フェーズ 1（調査）の説明</h1>
+  <p class="lead">main.sh に <code>--verbose</code> を足す前に、今の main.sh が何をしているかを確かめた作業です。コードは変えていません。</p>
+
+  <h2>いちばん大事なこと</h2>
+  <div class="card">
+    <p>main.sh は「入力ファイル・絞り込みの言葉・出力ファイル」の 3 つを受け取り、入力から言葉を含む行を探して番号を振り、<code>&lt;出力の接頭辞&gt;.txt</code> に書くスクリプトです。今回の調査では、この動きを読んで、実際に確かめた項目を整理しました。</p>
+  </div>
+
+  <h2>分かったこと</h2>
+  <ul>
+    <li><strong>引数が 3 つに足りないと</strong>、使い方を表示して終了コード 1 で止まる。</li>
+    <li><strong>入力ファイルが無い（またはフォルダ）と</strong>、エラーを表示して終了コード 1 で止まる。</li>
+    <li><strong>絞り込みは「含むかどうか」だけ</strong>で、正規表現ではない。<code>a.b</code> は <code>a.b</code> の行だけに当たる。</li>
+    <li><strong>一致が無いと</strong>、空の出力ファイルができて終了コード 0。</li>
+    <li><strong>出力先のフォルダが無いと</strong>、終了コード 2 になる（README の書き方とは違う）。</li>
+    <li><strong>今の <code>--verbose</code></strong> は、位置の引数として扱われ、「入力ファイルが見つかりません」で止まる。</li>
+  </ul>
+
+  <h2>足すときに触る場所</h2>
+  <div class="card">
+    <p>大きく 3 か所です。</p>
+    <ol>
+      <li>引数の受け取り（最初の方）。<code>--verbose</code> を先に見つけて外してから、数を数える。</li>
+      <li>経過を出す場所（入力の確認の後と、絞り込みの前後）。出すのは標準エラーだけにする。</li>
+      <li>使い方の文面（1 行か 2 行）。</li>
+    </ol>
+  </div>
+
+  <h2>まだ確かめていないこと</h2>
+  <ul>
+    <li>調査の多くは、サブエージェントの報告を基にしている。メインが打ち直して確かめたものではない。</li>
+    <li>README にある「テスト」の行と、コメントの意味は分からないまま。</li>
+    <li>テストのファイルは今のリポジトリには無い。流せるテストは無い。</li>
+  </ul>
+
+  <h2>次に進むこと</h2>
+  <p>この調査の結果を見て、次は「<code>--verbose</code> の置き場所と、経過に何を出すか」を決める設計に進みます。</p>
+</main>
+</body>
+</html>

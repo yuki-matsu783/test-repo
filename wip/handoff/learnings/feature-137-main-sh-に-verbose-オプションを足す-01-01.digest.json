@@ -1,0 +1,17 @@
+{
+ "recorded": true,
+ "counts": {
+  "deny": 4,
+  "ask": 0,
+  "nudge": 0,
+  "handover": 2
+ },
+ "repeated": [
+  {
+   "rule": "builtin:command-name-expansion",
+   "tool": "Bash",
+   "word": "-d",
+   "count": 2
+  }
+ ]
+}
